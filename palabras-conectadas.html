@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#4a2a6b">
+<title>Palabras Conectadas</title>
+
+<style>
+/* ==========================================================================
+   1. VARIABLES Y BASE
+   Cambia los colores aquí para retematizar todo el juego.
+   ========================================================================== */
+:root{
+  --ink:#4b1f6f;            /* color del texto de las letras de la rueda */
+  --accent:#ff7a3d;         /* naranja principal */
+  --accent-2:#ff4f81;       /* rosa secundario */
+  --gold:#ffd479;
+  --glass:rgba(255,255,255,.16);
+  --glass-border:rgba(255,255,255,.38);
+  --cell:44px;              /* tamaño de casilla (lo recalcula el JS) */
+  --wheel:300px;            /* tamaño de la rueda (lo recalcula el JS) */
+  --font:"Nunito","Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+/* --------------------------------------------------------------------------
+   SKINS COSMÉTICAS (Tienda)
+   Cada estilo es solo un conjunto de variables CSS. El JS pone  <body data-tile="wood" data-wheel="electric">
+   y las vistas previas de la tienda usan  .pv[data-skin="..."]  con exactamente las mismas variables.
+   Para crear un estilo nuevo: añade un bloque aquí y una entrada en el catálogo SHOP del JavaScript.
+   -------------------------------------------------------------------------- */
+:root,.pv[data-skin="classic"],.pv[data-skin="solar"]{
+  /* Ficha (cara revelada --tb-*, casilla vacía --tf-*) */
+  --tb-bg:linear-gradient(155deg,#fff8e4 0%,#ffd479 100%);
+  --tb-size:100% 100%;
+  --tb-border:2px solid #fff;
+  --tb-color:#7a3b00;
+  --tb-shadow:0 4px 0 #e0a23b,0 8px 14px rgba(80,30,0,.35);
+  --tb-ts:0 1px 0 rgba(255,255,255,.8);
+  --tb-anim:none;
+  --tf-border:rgba(255,255,255,.55);
+  --tf-shadow:inset 0 3px 8px rgba(60,20,90,.3);
+  /* Rayo y rueda */
+  --ln-glow:#ff9a3c;
+  --ln-main:#ff4f81;
+  --ln-spark:#fff;
+  --ln-dash:2 12;
+  --ln-anim:none;
+  --sel-bg:linear-gradient(145deg,#ff9a3c,#ff4f81);
+  --sel-shadow:0 0 0 3px rgba(255,255,255,.9),0 0 22px rgba(255,100,90,.9);
+  --wheel-bg:radial-gradient(circle at 30% 22%,rgba(255,255,255,.97),rgba(255,235,214,.9) 70%);
+  --center-bg:linear-gradient(145deg,#a86bff,#6a3ad6);
+  --center-edge:#4a24a8;
+}
+/* ★ Fichas · Madera Tallada */
+body[data-tile="wood"],.pv[data-skin="wood"]{
+  --tb-bg:repeating-linear-gradient(92deg,rgba(80,40,10,.16) 0 2px,transparent 2px 6px),linear-gradient(155deg,#e9bd84,#b9793b);
+  --tb-border:2px solid #7c4a1f;
+  --tb-color:#4a2606;
+  --tb-shadow:0 4px 0 #5e3410,0 8px 14px rgba(40,18,0,.45),inset 0 2px 0 rgba(255,230,190,.55);
+  --tb-ts:0 1px 0 rgba(255,225,170,.7),0 -1px 0 rgba(60,25,0,.55);
+  --tf-border:rgba(214,160,100,.85);
+}
+/* ★ Fichas · Esmeralda Real */
+body[data-tile="emerald"],.pv[data-skin="emerald"]{
+  --tb-bg:linear-gradient(145deg,#7bffc6,#15b573 50%,#08744a);
+  --tb-border:2px solid #c9ffe8;
+  --tb-color:#fff;
+  --tb-shadow:0 4px 0 #055437,0 8px 16px rgba(0,60,35,.5),inset 0 2px 0 rgba(255,255,255,.6),0 0 14px rgba(70,255,170,.45);
+  --tb-ts:0 2px 3px rgba(0,50,30,.7);
+  --tf-border:rgba(120,255,200,.8);
+}
+/* ★ Fichas · Neón Cyberpunk */
+body[data-tile="neon"],.pv[data-skin="neon"]{
+  --tb-bg:linear-gradient(145deg,#12122e,#1e0b3a);
+  --tb-border:2px solid #00f0ff;
+  --tb-color:#00f0ff;
+  --tb-shadow:0 0 12px #00f0ff,inset 0 0 10px rgba(255,0,229,.5),0 8px 14px rgba(0,0,0,.45);
+  --tb-ts:0 0 8px #00f0ff,0 0 16px #ff00e5;
+  --tf-border:rgba(255,0,229,.85);
+  --tf-shadow:inset 0 3px 8px rgba(60,20,90,.3),0 0 10px rgba(255,0,229,.55);
+}
+/* ★ Fichas · Oro Imperial (con destello que recorre la ficha) */
+body[data-tile="gold"],.pv[data-skin="gold"]{
+  --tb-bg:linear-gradient(120deg,#fff4b0 0%,#f6c42e 28%,#c88a0c 52%,#ffe27a 76%,#f6c42e 100%);
+  --tb-size:220% 220%;
+  --tb-border:2px solid #fff6c8;
+  --tb-color:#5a3600;
+  --tb-shadow:0 4px 0 #8f5c00,0 8px 16px rgba(120,70,0,.5),0 0 14px rgba(255,200,60,.7);
+  --tb-ts:0 1px 0 rgba(255,255,255,.85);
+  --tb-anim:goldShine 3.2s ease-in-out infinite;
+  --tf-border:rgba(255,215,90,.9);
+}
+@keyframes goldShine{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+/* ★ Rueda · Rayo Eléctrico Cian */
+body[data-wheel="electric"],.pv[data-skin="electric"]{
+  --ln-glow:#00e5ff;--ln-main:#19c4ff;--ln-spark:#ffffff;--ln-dash:8 6;
+  --sel-bg:linear-gradient(145deg,#00e5ff,#2a6bff);
+  --sel-shadow:0 0 0 3px #fff,0 0 24px #00e5ff;
+  --wheel-bg:radial-gradient(circle at 30% 22%,#f6fdff,#d3efff 70%);
+  --center-bg:linear-gradient(145deg,#2a6bff,#0a2fa8);--center-edge:#071f78;
+}
+/* ★ Rueda · Magia Púrpura */
+body[data-wheel="magic"],.pv[data-skin="magic"]{
+  --ln-glow:#c77dff;--ln-main:#9b4dff;--ln-spark:#ffe3ff;--ln-dash:2 12;
+  --sel-bg:linear-gradient(145deg,#c77dff,#6a2bd9);
+  --sel-shadow:0 0 0 3px #fff,0 0 24px #b25cff;
+  --wheel-bg:radial-gradient(circle at 30% 22%,#fcf5ff,#e4d2fa 70%);
+  --center-bg:linear-gradient(145deg,#8a3dff,#3d1a8f);--center-edge:#2a1068;
+}
+/* ★ Rueda · Arcoíris Boreal (el degradado #rainbowG está definido en el SVG de la rueda) */
+body[data-wheel="aurora"],.pv[data-skin="aurora"]{
+  --ln-glow:url(#rainbowG);--ln-main:url(#rainbowG);--ln-spark:#fff;--ln-dash:2 12;--ln-anim:hueSpin 5s linear infinite;
+  --sel-bg:linear-gradient(145deg,#4dffb0,#4aa8ff 55%,#c77dff);
+  --sel-shadow:0 0 0 3px #fff,0 0 24px rgba(110,255,210,.95);
+  --wheel-bg:radial-gradient(circle at 30% 22%,#f7fffc,#e3eeff 70%);
+  --center-bg:linear-gradient(145deg,#38d9a9,#4a7bff);--center-edge:#2a58c4;
+}
+@keyframes hueSpin{to{filter:hue-rotate(360deg)}}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#2b1b5a;font-family:var(--font);color:#fff}
+button{font-family:inherit;cursor:pointer;border:0}
+
+/* ==========================================================================
+   2. FONDO: PAISAJE AL ATARDECER (todo CSS + SVG inline, sin imágenes)
+   Capas: cielo → estrellas → sol → nubes → montañas → río → pinos → luciérnagas
+   ========================================================================== */
+/* --------------------------------------------------------------------------
+   AMBIENTES DINÁMICOS (cambian cada 5 niveles: Math.floor(nivel / 5))
+   Cada ambiente es solo un conjunto de variables CSS. Se registran con @property
+   para que el navegador pueda INTERPOLAR los colores y el cambio sea un fundido suave
+   (en navegadores sin @property el cambio es instantáneo, pero funciona igual).
+   Para crear un ambiente nuevo: añade un bloque  .scene[data-theme="4"]{ ... }
+   y una entrada en el array THEMES del JavaScript.
+   -------------------------------------------------------------------------- */
+@property --sk0{syntax:'<color>';inherits:true;initial-value:#27194f}   /* cielo: 6 paradas de arriba a abajo */
+@property --sk1{syntax:'<color>';inherits:true;initial-value:#5b2d86}
+@property --sk2{syntax:'<color>';inherits:true;initial-value:#b0457f}
+@property --sk3{syntax:'<color>';inherits:true;initial-value:#f2706a}
+@property --sk4{syntax:'<color>';inherits:true;initial-value:#ffa660}
+@property --sk5{syntax:'<color>';inherits:true;initial-value:#ffd98a}
+@property --sun-a{syntax:'<color>';inherits:true;initial-value:#fffbe0}   /* sol / luna: núcleo, aro, halo */
+@property --sun-b{syntax:'<color>';inherits:true;initial-value:#ffe08a}
+@property --sun-c{syntax:'<color>';inherits:true;initial-value:rgba(255,170,90,.55)}
+@property --mf0{syntax:'<color>';inherits:true;initial-value:#8f4f9c}     /* montañas lejanas */
+@property --mf1{syntax:'<color>';inherits:true;initial-value:#d9708a}
+@property --mm0{syntax:'<color>';inherits:true;initial-value:#5d2f86}     /* colinas medias */
+@property --mm1{syntax:'<color>';inherits:true;initial-value:#a24a86}
+@property --mn0{syntax:'<color>';inherits:true;initial-value:#34204f}     /* colinas cercanas */
+@property --mn1{syntax:'<color>';inherits:true;initial-value:#4b2a62}
+@property --rv0{syntax:'<color>';inherits:true;initial-value:#ffc277}     /* río */
+@property --rv1{syntax:'<color>';inherits:true;initial-value:#e5699a}
+@property --rv2{syntax:'<color>';inherits:true;initial-value:#5b3a9c}
+@property --tree{syntax:'<color>';inherits:true;initial-value:#241438}    /* pinos */
+@property --cloud{syntax:'<color>';inherits:true;initial-value:rgba(255,214,220,.55)}
+@property --stars{syntax:'<number>';inherits:true;initial-value:.7}       /* visibilidad de las estrellas */
+@property --aurora{syntax:'<number>';inherits:true;initial-value:0}       /* visibilidad de la aurora */
+@property --veil{syntax:'<number>';inherits:true;initial-value:0}         /* velo oscuro para dar contraste a la UI */
+@property --sun-y{syntax:'<percentage>';inherits:true;initial-value:44%}  /* altura del sol / luna */
+
+.scene{
+  position:fixed;inset:0;z-index:0;overflow:hidden;
+  /* ★ Ambiente 0 · ATARDECER (niveles 1-5) — valores por defecto */
+  --sk0:#27194f;--sk1:#5b2d86;--sk2:#b0457f;--sk3:#f2706a;--sk4:#ffa660;--sk5:#ffd98a;
+  --sun-a:#fffbe0;--sun-b:#ffe08a;--sun-c:rgba(255,170,90,.55);--sun-y:44%;
+  --mf0:#8f4f9c;--mf1:#d9708a;--mm0:#5d2f86;--mm1:#a24a86;--mn0:#34204f;--mn1:#4b2a62;
+  --rv0:#ffc277;--rv1:#e5699a;--rv2:#5b3a9c;--tree:#241438;
+  --cloud:rgba(255,214,220,.55);--stars:.7;--aurora:0;--veil:0;
+  /* El fundido entre ambientes: 2.4 s */
+  transition:
+    --sk0 2.4s ease,--sk1 2.4s ease,--sk2 2.4s ease,--sk3 2.4s ease,--sk4 2.4s ease,--sk5 2.4s ease,
+    --sun-a 2.4s ease,--sun-b 2.4s ease,--sun-c 2.4s ease,--sun-y 2.4s ease,
+    --mf0 2.4s ease,--mf1 2.4s ease,--mm0 2.4s ease,--mm1 2.4s ease,--mn0 2.4s ease,--mn1 2.4s ease,
+    --rv0 2.4s ease,--rv1 2.4s ease,--rv2 2.4s ease,--tree 2.4s ease,
+    --cloud 2.4s ease,--stars 2.4s ease,--aurora 2.4s ease,--veil 2.4s ease;
+}
+/* ★ Ambiente 1 · NOCHE ESTRELLADA (niveles 6-10): azules oscuros y violetas, luna pálida */
+.scene[data-theme="1"]{
+  --sk0:#050b2a;--sk1:#0c1a4d;--sk2:#1d2a6e;--sk3:#3a2f86;--sk4:#5a3a9a;--sk5:#7a4aa8;
+  --sun-a:#f4f7ff;--sun-b:#cdd8ff;--sun-c:rgba(150,170,255,.45);--sun-y:24%;
+  --mf0:#2b3a7a;--mf1:#4b4a98;--mm0:#1c2a5e;--mm1:#3a3a86;--mn0:#0f1838;--mn1:#1c2250;
+  --rv0:#7f9bff;--rv1:#4a56c0;--rv2:#1c1a6a;--tree:#070b1f;
+  --cloud:rgba(150,160,230,.22);--stars:1;--aurora:0;--veil:0;
+}
+/* ★ Ambiente 2 · AMANECER (niveles 11-15): rosados, celestes y amarillos suaves */
+.scene[data-theme="2"]{
+  --sk0:#4f9fe0;--sk1:#86b6ee;--sk2:#e7a3c9;--sk3:#f5a1a0;--sk4:#ffc98a;--sk5:#ffe6a3;
+  --sun-a:#ffffff;--sun-b:#fff3b0;--sun-c:rgba(255,220,130,.55);--sun-y:52%;
+  --mf0:#b58ac8;--mf1:#f0a9bd;--mm0:#8f6fb8;--mm1:#d58aa8;--mn0:#5a4a86;--mn1:#7a5f9a;
+  --rv0:#ffe9a8;--rv1:#ffb3c8;--rv2:#8fa8e8;--tree:#3a2a5c;
+  --cloud:rgba(255,255,255,.6);--stars:0;--aurora:0;--veil:.2;
+}
+/* ★ Ambiente 3 · AURORA BOREAL (niveles 16-20): verdes y cianes oscuros con cintas de luz */
+.scene[data-theme="3"]{
+  --sk0:#02101a;--sk1:#04283a;--sk2:#064a4c;--sk3:#0b6b5a;--sk4:#12525e;--sk5:#0a2a48;
+  --sun-a:#eafff6;--sun-b:#9ff5d0;--sun-c:rgba(80,230,190,.4);--sun-y:22%;
+  --mf0:#1b5a68;--mf1:#2f8a86;--mm0:#0f3f4f;--mm1:#1e6a70;--mn0:#082433;--mn1:#0f3a46;
+  --rv0:#7affd0;--rv1:#1fb4a8;--rv2:#0b4a78;--tree:#031219;
+  --cloud:rgba(120,255,220,.14);--stars:1;--aurora:1;--veil:0;
+}
+/* ★ Ambiente 4 · BOSQUE MÁGICO (niveles 21-25): verdes esmeralda y musgo */
+.scene[data-theme="4"]{
+  --sk0:#04140f;--sk1:#0a3a2b;--sk2:#1c6b45;--sk3:#4aa05a;--sk4:#a9c96a;--sk5:#f4e08a;
+  --sun-a:#fffbd0;--sun-b:#ffe88a;--sun-c:rgba(255,205,95,.55);--sun-y:46%;
+  --mf0:#2f6b57;--mf1:#74b583;--mm0:#1c5a40;--mm1:#3e8a55;--mn0:#0b2e22;--mn1:#164a33;
+  --rv0:#ffe9a0;--rv1:#4fc08a;--rv2:#0d4a3a;--tree:#04170f;
+  --cloud:rgba(200,255,205,.2);--stars:.55;--aurora:0;--veil:.12;
+}
+/* ★ Ambiente 5 · DESIERTO DORADO (niveles 26-30): ocres, arenas y amarillos intensos */
+.scene[data-theme="5"]{
+  --sk0:#7a4a1e;--sk1:#b8742a;--sk2:#e39a33;--sk3:#f5bf4a;--sk4:#ffd873;--sk5:#fff0b0;
+  --sun-a:#ffffff;--sun-b:#fff2a8;--sun-c:rgba(255,200,60,.6);--sun-y:40%;
+  --mf0:#c98a3c;--mf1:#f0b85a;--mm0:#a86a28;--mm1:#d99a45;--mn0:#6e3f16;--mn1:#96592a;
+  --rv0:#fff0b0;--rv1:#f0b04a;--rv2:#b8742a;--tree:#3a2008;
+  --cloud:rgba(255,235,190,.5);--stars:0;--aurora:0;--veil:.3;
+}
+/* ★ Ambiente 6 · OCÉANO PROFUNDO (niveles 31-35): azules abisales, cianes y turquesas oscuros */
+.scene[data-theme="6"]{
+  --sk0:#00060f;--sk1:#01162e;--sk2:#022d52;--sk3:#05507a;--sk4:#0a7f9a;--sk5:#17b0b0;
+  --sun-a:#d8ffff;--sun-b:#7fe8ee;--sun-c:rgba(60,200,220,.45);--sun-y:28%;
+  --mf0:#0b3d63;--mf1:#1b7a9a;--mm0:#08284a;--mm1:#12607f;--mn0:#031527;--mn1:#0a3248;
+  --rv0:#6ff0e0;--rv1:#1fb0c0;--rv2:#06365c;--tree:#020e1a;
+  --cloud:rgba(120,230,240,.14);--stars:.35;--aurora:0;--veil:0;
+}
+/* ★ Ambiente 7 · GALAXIA / NEBULOSA (niveles 36-40): violetas oscuros, fucsias y magenta */
+.scene[data-theme="7"]{
+  --sk0:#0a0420;--sk1:#230a52;--sk2:#4b1088;--sk3:#8a1fa0;--sk4:#c4308f;--sk5:#ff5fa8;
+  --sun-a:#fff0ff;--sun-b:#ff9be0;--sun-c:rgba(200,80,255,.5);--sun-y:26%;
+  --mf0:#3a1470;--mf1:#7a2aa0;--mm0:#26094f;--mm1:#5a1a85;--mn0:#12052e;--mn1:#2c0d55;
+  --rv0:#ff9be8;--rv1:#b04dff;--rv2:#2a1070;--tree:#0a0320;
+  --cloud:rgba(255,150,230,.22);--stars:1;--aurora:.85;--veil:0;
+}
+/* La nebulosa reutiliza la capa .aurora con colores fucsia, violeta y azul */
+.scene[data-theme="7"] .aurora,.scene[data-theme="8"] .aurora{
+  background:
+    radial-gradient(ellipse 55% 22% at 28% 38%,rgba(255,80,200,.7),transparent 70%),
+    radial-gradient(ellipse 50% 20% at 72% 28%,rgba(130,90,255,.65),transparent 70%),
+    radial-gradient(ellipse 38% 16% at 50% 55%,rgba(60,170,255,.45),transparent 70%);
+}
+/* ★ Ambiente 8 · VOLCÁN ÉPICO (niveles 41-45): rojos ardientes, granates y naranjas oscuros */
+.scene[data-theme="8"]{
+  --sk0:#12030a;--sk1:#3a0710;--sk2:#7a1010;--sk3:#c02a10;--sk4:#ff6a1a;--sk5:#ffb43a;
+  --sun-a:#fff3c0;--sun-b:#ff9a2a;--sun-c:rgba(255,70,20,.6);--sun-y:50%;
+  --mf0:#4a1010;--mf1:#a02a14;--mm0:#2e0a0c;--mm1:#6a1a10;--mn0:#14040a;--mn1:#2a0b0e;
+  --rv0:#ffe27a;--rv1:#ff5a1a;--rv2:#7a0a0a;--tree:#0a0204;
+  --cloud:rgba(90,50,50,.45);--stars:.15;--aurora:0;--veil:.1;
+}
+/* ★ Ambiente 9 · CUMBRES NEVADAS (niveles 46-50): blancos, grises claros, platas y azules glaciar */
+.scene[data-theme="9"]{
+  --sk0:#17325a;--sk1:#2c5a8f;--sk2:#5b8fbf;--sk3:#9bc3e0;--sk4:#cfe4f2;--sk5:#eef6fb;
+  --sun-a:#ffffff;--sun-b:#fff7d6;--sun-c:rgba(255,240,200,.5);--sun-y:40%;
+  --mf0:#cfe0ee;--mf1:#ffffff;--mm0:#9fb8d0;--mm1:#dbe8f3;--mn0:#5c7690;--mn1:#8aa3bb;
+  --rv0:#e8fbff;--rv1:#8fd0f0;--rv2:#3a78b8;--tree:#2a4a63;
+  --cloud:rgba(255,255,255,.65);--stars:0;--aurora:0;--veil:.32;
+}
+
+.sky{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,var(--sk0) 0%,var(--sk1) 22%,var(--sk2) 45%,var(--sk3) 66%,var(--sk4) 82%,var(--sk5) 100%);
+  background-size:100% 140%;
+  animation:skyShift 40s ease-in-out infinite alternate;   /* el cielo "respira" lentamente */
+}
+@keyframes skyShift{from{background-position:0 0}to{background-position:0 100%}}
+
+.stars{position:absolute;inset:0 0 50% 0;opacity:var(--stars)}
+
+/* Aurora boreal: cintas de luz difuminadas que ondulan (solo visibles en el ambiente 3) */
+.aurora{
+  position:absolute;inset:0 -10% 38% -10%;opacity:var(--aurora);mix-blend-mode:screen;filter:blur(22px);
+  background:
+    radial-gradient(ellipse 55% 22% at 28% 38%,rgba(70,255,170,.75),transparent 70%),
+    radial-gradient(ellipse 50% 20% at 72% 28%,rgba(80,210,255,.65),transparent 70%),
+    radial-gradient(ellipse 38% 16% at 50% 55%,rgba(170,120,255,.5),transparent 70%);
+  animation:auroraWave 14s ease-in-out infinite alternate;
+}
+@keyframes auroraWave{
+  0%{transform:translateX(-6%) scaleY(1)}
+  50%{transform:translateX(5%) scaleY(1.25) skewX(4deg)}
+  100%{transform:translateX(-2%) scaleY(.9) skewX(-4deg)}
+}
+.star{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;opacity:.8;animation:twinkle 3s ease-in-out infinite}
+@keyframes twinkle{0%,100%{opacity:.15;transform:scale(.7)}50%{opacity:1;transform:scale(1.3)}}
+
+.sun{
+  position:absolute;left:50%;top:var(--sun-y);width:min(46vmin,260px);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,var(--sun-a) 0%,var(--sun-b) 35%,var(--sun-c) 60%,transparent 72%);
+  filter:blur(1px);animation:sunPulse 6s ease-in-out infinite;
+}
+@keyframes sunPulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.07)}}
+
+/* Nubes: cada una son varios círculos difuminados que derivan horizontalmente */
+.cloud{position:absolute;width:180px;height:50px;border-radius:50px;background:var(--cloud);filter:blur(6px);animation:drift linear infinite}
+.cloud::before,.cloud::after{content:"";position:absolute;background:inherit;border-radius:50%}
+.cloud::before{width:80px;height:80px;left:22px;top:-34px}
+.cloud::after{width:60px;height:60px;left:86px;top:-24px}
+.c1{top:14%;left:-220px;animation-duration:90s}
+.c2{top:26%;left:-220px;animation-duration:140s;animation-delay:-60s;transform:scale(.7);opacity:.8}
+.c3{top:8%;left:-220px;animation-duration:115s;animation-delay:-20s;transform:scale(1.2);opacity:.6}
+@keyframes drift{to{translate:calc(100vw + 440px) 0}}
+
+.landscape{position:absolute;left:0;bottom:0;width:100%;height:62%}
+
+/* Reflejo brillante del río (líneas que "caminan") */
+.riverlines path{stroke:rgba(255,255,255,.55);stroke-width:2;fill:none;stroke-linecap:round;stroke-dasharray:18 40;animation:flow 3.5s linear infinite}
+.riverlines path:nth-child(2){animation-duration:4.6s;stroke:rgba(255,230,170,.6)}
+.riverlines path:nth-child(3){animation-duration:5.4s}
+@keyframes flow{to{stroke-dashoffset:-116}}
+
+/* Luciérnagas (las crea el JS) */
+.firefly{position:absolute;width:5px;height:5px;border-radius:50%;background:#fff6b0;box-shadow:0 0 10px 3px rgba(255,240,140,.8);opacity:0;animation:fly linear infinite}
+@keyframes fly{
+  0%{opacity:0;transform:translate(0,0)}
+  15%{opacity:.9}
+  50%{transform:translate(30px,-60px)}
+  85%{opacity:.9}
+  100%{opacity:0;transform:translate(-20px,-130px)}
+}
+/* Viñeta oscura para que la interfaz destaque */
+/* (--veil oscurece un poco el cielo cuando es muy claro, como en el amanecer, para que el texto blanco se lea bien) */
+.vignette{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse at 50% 40%,transparent 40%,rgba(30,10,60,.45) 100%),
+    linear-gradient(rgba(40,20,80,var(--veil)),rgba(40,20,80,var(--veil)));
+}
+
+/* ==========================================================================
+   3. ESTRUCTURA DE LA PANTALLA DE JUEGO
+   ========================================================================== */
+#fx{position:fixed;inset:0;z-index:85;pointer-events:none}   /* canvas de partículas (por encima de los modales para que el confeti se vea) */
+
+.game{
+  position:relative;z-index:2;height:100dvh;max-width:560px;margin:0 auto;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding:max(10px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));
+}
+
+/* --- Barra superior --- */
+.topbar{width:100%;display:flex;align-items:center;gap:8px}
+.pill{
+  display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-weight:900;font-size:15px;
+  background:var(--glass);border:1.5px solid var(--glass-border);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  text-shadow:0 1px 3px rgba(60,10,70,.5);box-shadow:0 4px 14px rgba(40,10,70,.25);
+}
+.pill.grow{flex:1;justify-content:center;min-width:0;white-space:nowrap}
+.pill small{font-weight:700;opacity:.85;font-size:12px}
+.pill.bump{animation:bump .4s}
+/* Píldora de progreso convertida en botón: efecto hover/active sutil */
+button.pill{color:#fff;font-family:inherit;cursor:pointer;transition:transform .15s,background .2s,box-shadow .2s}
+button.pill:hover{background:rgba(255,255,255,.28);transform:translateY(-1px);box-shadow:0 6px 18px rgba(40,10,70,.35)}
+button.pill:active{transform:scale(.96)}
+button.pill:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@keyframes bump{40%{transform:scale(1.18)}}
+.icon-btn{
+  width:42px;height:42px;border-radius:50%;font-size:19px;color:#fff;
+  background:var(--glass);border:1.5px solid var(--glass-border);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:transform .15s,background .2s;
+}
+.icon-btn:hover{background:rgba(255,255,255,.28);transform:translateY(-2px)}
+.icon-btn:active{transform:scale(.9)}
+
+/* Nivel Jefe / Especial: píldora dorada con brillo, en dos líneas en pantallas estrechas */
+#levelPill.boss{
+  flex-direction:column;gap:0;line-height:1.05;padding:5px 12px;border:2px solid #ffd54a;
+  background:linear-gradient(160deg,rgba(255,213,74,.35),rgba(255,140,40,.2));animation:bossGlow 2s ease-in-out infinite;
+}
+#levelPill.boss small{font-size:11px;color:#ffe9a0;opacity:1}
+@keyframes bossGlow{
+  0%,100%{box-shadow:0 4px 14px rgba(40,10,70,.25),0 0 8px 1px rgba(255,200,60,.55)}
+  50%{box-shadow:0 4px 14px rgba(40,10,70,.25),0 0 20px 4px rgba(255,210,70,.95)}
+}
+body.boss .board-wrap{border-color:rgba(255,213,74,.85);box-shadow:0 10px 40px rgba(30,10,60,.35),0 0 24px rgba(255,200,60,.35)}
+@media (min-width:421px){ #levelPill.boss{flex-direction:row;gap:6px} }
+/* Pantallas estrechas: la barra superior ahora tiene 5 elementos, así que compactamos */
+@media (max-width:420px){
+  .topbar{gap:6px}
+  .pill{padding:7px 10px;font-size:14px}
+  .pill small.lbl{display:none}
+  .icon-btn{width:38px;height:38px;font-size:17px}
+}
+
+/* --- Panel del crucigrama --- */
+.board-wrap{
+  flex:1;min-height:0;width:100%;display:grid;place-items:center;padding:12px;border-radius:26px;
+  background:linear-gradient(160deg,rgba(255,255,255,.18),rgba(255,255,255,.07));
+  border:1.5px solid var(--glass-border);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 10px 40px rgba(30,10,60,.35);
+}
+#board{display:grid;gap:6px;justify-content:center;align-content:center}
+
+/* Casilla: la animación de volteo se hace girando .tile sobre el eje Y */
+.cell{
+  width:var(--cell);height:var(--cell);perspective:700px;
+  animation:popIn .5s var(--d,0s) both cubic-bezier(.2,1.5,.4,1);
+}
+@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.tile{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.3,1.6,.5,1)}
+.cell.revealed .tile{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;border-radius:24%;display:grid;place-items:center;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.front{
+  background:linear-gradient(160deg,rgba(255,255,255,.34),rgba(255,255,255,.14));
+  border:2px solid var(--tf-border);box-shadow:var(--tf-shadow);
+}
+.back{
+  transform:rotateY(180deg);
+  background:var(--tb-bg);background-size:var(--tb-size);animation:var(--tb-anim);
+  border:var(--tb-border);color:var(--tb-color);font-weight:900;font-size:calc(var(--cell)*.6);
+  box-shadow:var(--tb-shadow);text-shadow:var(--tb-ts);
+}
+.cell.bounce{animation:bounce .55s}
+@keyframes bounce{0%{transform:translateY(0)}30%{transform:translateY(-14px) scale(1.12)}55%{transform:translateY(0) scale(.94)}75%{transform:translateY(-4px)}100%{transform:translateY(0)}}
+.cell.pulse .back{animation:pulse .7s}
+@keyframes pulse{50%{filter:brightness(1.35);transform:rotateY(180deg) scale(1.2)}}
+
+/* Casilla con tesoro: moneda semitransparente y borde dorado antes de revelarse */
+.cell.treasure .front{box-shadow:var(--tf-shadow),0 0 12px 2px rgba(255,210,90,.6);border-color:rgba(255,226,130,.95)}
+.coin-mark{
+  font-size:calc(var(--cell)*.46);opacity:.6;filter:drop-shadow(0 0 4px rgba(255,210,90,.9));
+  animation:coinGlint 2.4s ease-in-out infinite;
+}
+@keyframes coinGlint{0%,100%{transform:scale(.9) rotate(-8deg);opacity:.45}50%{transform:scale(1.1) rotate(8deg);opacity:.85}}
+
+/* --- Burbuja con la palabra en construcción --- */
+.bubble-zone{position:relative;height:48px;width:100%;display:grid;place-items:center}
+
+/* Indicador de racha / combo (🔥 x2, 🔥 x3...) junto a la burbuja */
+.combo-badge{
+  position:absolute;right:2px;top:50%;transform:translateY(-50%) scale(.6);opacity:0;pointer-events:none;
+  padding:5px 11px;border-radius:999px;font-weight:900;font-size:16px;color:#fff;white-space:nowrap;
+  background:linear-gradient(145deg,rgba(255,150,40,.92),rgba(255,70,70,.92));border:1.5px solid rgba(255,255,255,.7);
+  box-shadow:0 0 12px rgba(255,120,40,.7);text-shadow:0 1px 2px rgba(120,20,0,.6);
+  transition:opacity .2s,transform .25s cubic-bezier(.3,1.6,.5,1);
+}
+.combo-badge.on{opacity:1;transform:translateY(-50%) scale(1)}
+.combo-badge.hot{box-shadow:0 0 20px 3px rgba(255,170,40,.95);animation:flame 1s ease-in-out infinite alternate}
+.combo-badge.pop{animation:comboPop .4s}
+.combo-badge.lost{animation:comboLost .45s forwards}
+@keyframes flame{from{filter:brightness(1)}to{filter:brightness(1.25) saturate(1.2)}}
+@keyframes comboPop{0%{transform:translateY(-50%) scale(1)}40%{transform:translateY(-50%) scale(1.4)}100%{transform:translateY(-50%) scale(1)}}
+@keyframes comboLost{
+  0%{opacity:1;transform:translateY(-50%) scale(1)}
+  30%{transform:translateY(-50%) translateX(-7px)}
+  60%{transform:translateY(-50%) translateX(7px)}
+  100%{opacity:0;transform:translateY(-50%) scale(.5)}
+}
+#bubble{
+  display:flex;gap:4px;padding:6px 16px;min-height:44px;align-items:center;border-radius:999px;
+  background:linear-gradient(145deg,#ff9a3c,#ff4f81);box-shadow:0 6px 18px rgba(255,80,100,.5);
+  font-weight:900;font-size:24px;letter-spacing:3px;
+  opacity:0;transform:scale(.6);transition:opacity .15s,transform .2s cubic-bezier(.3,1.6,.5,1),background .2s;
+}
+#bubble.show{opacity:1;transform:scale(1)}
+#bubble.ok{background:linear-gradient(145deg,#38d97a,#13a85a);box-shadow:0 6px 18px rgba(30,200,100,.55)}
+#bubble.bonus{background:linear-gradient(145deg,#6ecbff,#4a7bff);box-shadow:0 6px 18px rgba(70,130,255,.55)}
+#bubble.dup{background:linear-gradient(145deg,#ffd479,#ffae2d);color:#6a3b00}
+#bubble.bad{background:linear-gradient(145deg,#ff6b6b,#d62a4a);animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+
+/* --- Zona de la rueda --- */
+.wheel-zone{position:relative;width:100%;display:grid;place-items:center;padding-bottom:4px}
+.side-btn{
+  position:absolute;bottom:2px;width:54px;height:54px;border-radius:50%;font-size:22px;color:#fff;
+  display:grid;place-items:center;line-height:1;
+  background:linear-gradient(160deg,rgba(255,255,255,.3),rgba(255,255,255,.12));border:1.5px solid var(--glass-border);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 6px 16px rgba(40,10,70,.3);
+  transition:transform .15s,background .2s;
+}
+.side-btn small{font-size:11px;font-weight:900;margin-top:-2px}
+.side-btn:hover{transform:translateY(-3px);background:rgba(255,255,255,.35)}
+.side-btn:active{transform:scale(.9)}
+#hintBtn{left:2px}
+#adBtn{right:2px}
+/* Botón de anuncio recompensado: destaca con un brillo suave para invitar a pulsarlo */
+#adBtn{background:linear-gradient(160deg,rgba(255,212,121,.55),rgba(255,122,61,.35));animation:adGlow 2.4s ease-in-out infinite}
+@keyframes adGlow{0%,100%{box-shadow:0 6px 16px rgba(40,10,70,.3)}50%{box-shadow:0 6px 16px rgba(40,10,70,.3),0 0 18px 4px rgba(255,190,90,.75)}}
+#adBtn.busy{animation:none;opacity:.55;pointer-events:none}   /* mientras "se reproduce" el anuncio */
+
+#wheel{
+  position:relative;width:var(--wheel);height:var(--wheel);border-radius:50%;touch-action:none;user-select:none;-webkit-user-select:none;
+  background:var(--wheel-bg);
+  box-shadow:0 14px 40px rgba(50,10,70,.5),inset 0 -10px 24px rgba(210,120,90,.28);
+}
+#wheel.bad{animation:shake .4s}
+#lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+#lines polyline{fill:none;stroke-linecap:round;stroke-linejoin:round}
+#lines .glow{stroke:var(--ln-glow);stroke-width:16;opacity:.8;filter:url(#glowF)}
+#lines .main{stroke:var(--ln-main);stroke-width:8}
+#lines .spark{stroke:var(--ln-spark);stroke-width:3;stroke-dasharray:var(--ln-dash);animation:dash .6s linear infinite}
+#lines{animation:var(--ln-anim)}
+@keyframes dash{to{stroke-dashoffset:-28}}
+#wheel.ok .main{stroke:#22c768}   #wheel.ok .glow{stroke:#5dffa0}
+#wheel.bonus .main{stroke:#4a7bff} #wheel.bonus .glow{stroke:#6ecbff}
+#wheel.bad .main{stroke:#d62a4a}  #wheel.bad .glow{stroke:#ff6b6b}
+#wheel.dup .main{stroke:#ffae2d}
+
+.letter{
+  position:absolute;z-index:2;display:grid;place-items:center;border-radius:50%;pointer-events:none;
+  font-weight:900;color:var(--ink);font-size:calc(var(--ls)*.58);
+  background:transparent;
+  transition:left .55s cubic-bezier(.3,1.4,.5,1),top .55s cubic-bezier(.3,1.4,.5,1),transform .15s,background .15s,color .15s,box-shadow .15s;
+}
+.letter.sel{
+  background:var(--sel-bg);color:#fff;transform:scale(1.14);
+  box-shadow:var(--sel-shadow);
+}
+.center-btn{
+  position:absolute;z-index:3;left:50%;top:50%;width:22%;height:22%;transform:translate(-50%,-50%);border-radius:50%;
+  font-size:calc(var(--wheel)*.09);color:#fff;display:grid;place-items:center;
+  background:var(--center-bg);box-shadow:0 5px 0 var(--center-edge),0 10px 16px rgba(60,20,120,.4);
+  transition:transform .12s,box-shadow .12s;
+}
+.center-btn:hover{transform:translate(-50%,-52%)}
+.center-btn:active{transform:translate(-50%,-44%);box-shadow:0 1px 0 var(--center-edge)}
+.center-btn.spin{animation:spin .5s}
+@keyframes spin{to{rotate:360deg}}
+
+/* ==========================================================================
+   4. MENSAJES FLOTANTES ("¡Genial!") Y SUPERPOSICIONES
+   ========================================================================== */
+.toast{
+  position:fixed;left:50%;z-index:60;pointer-events:none;white-space:nowrap;
+  font-weight:900;font-size:clamp(28px,8vw,44px);color:#fff;
+  text-shadow:0 3px 0 var(--accent-2),0 0 22px rgba(255,150,80,.95),0 6px 14px rgba(60,10,70,.6);
+  animation:toastUp 1.3s cubic-bezier(.2,.9,.3,1) forwards;
+}
+.toast.bonus{text-shadow:0 3px 0 #3466e0,0 0 22px rgba(110,200,255,.95),0 6px 14px rgba(20,30,90,.6)}
+.toast.info{font-size:22px;text-shadow:0 2px 6px rgba(40,10,70,.8)}
+@keyframes toastUp{
+  0%{opacity:0;transform:translate(-50%,20px) scale(.4)}
+  20%{opacity:1;transform:translate(-50%,-6px) scale(1.2)}
+  35%{transform:translate(-50%,-10px) scale(1)}
+  80%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-80px) scale(1)}
+}
+
+.overlay{
+  position:fixed;inset:0;z-index:70;display:none;place-items:center;padding:20px;
+  background:rgba(25,10,50,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+.overlay.show{display:grid;animation:fade .3s}
+@keyframes fade{from{opacity:0}}
+.card{
+  width:min(92vw,380px);text-align:center;padding:28px 24px 24px;border-radius:30px;
+  background:linear-gradient(160deg,rgba(255,255,255,.28),rgba(255,255,255,.1));border:2px solid var(--glass-border);
+  box-shadow:0 20px 60px rgba(20,5,50,.6);animation:cardIn .6s cubic-bezier(.2,1.5,.4,1);
+}
+@keyframes cardIn{from{transform:scale(.5) translateY(40px);opacity:0}}
+.card .icon{font-size:64px;animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-10px) rotate(6deg)}}
+.card h1,.card h2{margin:6px 0;font-size:30px;text-shadow:0 3px 0 rgba(255,79,129,.8),0 6px 14px rgba(40,10,70,.5)}
+.card p{margin:6px 0 18px;font-size:17px;font-weight:700;opacity:.95}
+.big-btn{
+  padding:14px 34px;border-radius:999px;font-size:20px;font-weight:900;color:#fff;
+  background:linear-gradient(145deg,#ffa63d,#ff4f81);box-shadow:0 6px 0 #c2305f,0 12px 22px rgba(255,60,100,.45);
+  transition:transform .12s,box-shadow .12s;
+}
+.big-btn:hover{transform:translateY(-2px)}
+.big-btn:active{transform:translateY(5px);box-shadow:0 1px 0 #c2305f}
+
+/* --- Modal de palabras extra (mismo cristal translúcido que el resto de la UI) --- */
+.bonus-card{position:relative;max-width:400px}
+.close-btn{
+  position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:50%;font-size:17px;font-weight:900;color:#fff;
+  background:var(--glass);border:1.5px solid var(--glass-border);transition:transform .15s,background .2s;
+}
+.close-btn:hover{background:rgba(255,255,255,.3);transform:rotate(90deg)}
+.close-btn:active{transform:scale(.88)}
+.bonus-card h2{margin:4px 0 2px}
+.bonus-count{margin:0 0 14px;font-size:15px;font-weight:800;opacity:.9}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-height:min(40vh,260px);overflow-y:auto;padding:4px 2px 8px;margin-bottom:10px}
+.chip{
+  padding:7px 14px;border-radius:999px;font-weight:900;font-size:18px;letter-spacing:2px;color:#fff;
+  background:linear-gradient(145deg,#6ecbff,#4a7bff);box-shadow:0 4px 0 #2f55c4,0 8px 14px rgba(40,70,200,.35);
+  text-shadow:0 1px 2px rgba(20,30,90,.5);animation:chipIn .45s var(--d,0s) both cubic-bezier(.2,1.6,.4,1);
+}
+@keyframes chipIn{from{transform:scale(0) rotate(-12deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+.bonus-empty{margin:6px 0 14px;font-size:17px;font-weight:700;line-height:1.4}
+.bonus-empty small{display:block;margin-top:8px;font-size:14px;opacity:.85}
+.bonus-foot{margin:0 0 4px;font-size:13px;font-weight:700;opacity:.8}
+
+/* --- Pantalla de victoria: botón secundario "Duplicar recompensa" --- */
+.double-btn{
+  display:block;margin:14px auto 0;padding:12px 26px;border-radius:999px;font-size:18px;font-weight:900;color:#3a2200;
+  background:linear-gradient(145deg,#ffe27a,#ffb02e);box-shadow:0 6px 0 #b8741a,0 12px 22px rgba(255,170,40,.5);
+  animation:dblPulse 1.4s ease-in-out infinite;transition:transform .12s,box-shadow .12s;
+}
+.double-btn:hover{transform:translateY(-2px)}
+.double-btn:active{transform:translateY(5px);box-shadow:0 1px 0 #b8741a;animation:none}
+.double-btn:disabled{opacity:.6;pointer-events:none;animation:none}
+.double-btn[hidden]{display:none}
+@keyframes dblPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.card .big-btn:disabled{opacity:.6;pointer-events:none}
+
+/* --- Tienda de personalización (glassmorphism, como el resto de modales) --- */
+.shop-card{position:relative;width:min(94vw,430px);max-height:88dvh;display:flex;flex-direction:column;padding:22px 16px 16px}
+.shop-card h2{margin:0 0 2px;font-size:26px}
+.shop-balance{margin:0 0 10px;font-size:16px;font-weight:900}
+.shop-tabs{display:flex;gap:8px;margin-bottom:10px}
+.shop-tab{
+  flex:1;padding:9px 6px;border-radius:999px;font-size:14px;font-weight:900;color:#fff;
+  background:var(--glass);border:1.5px solid var(--glass-border);transition:background .2s,transform .12s;
+}
+.shop-tab:active{transform:scale(.95)}
+.shop-tab.active{background:linear-gradient(145deg,#ffa63d,#ff4f81);border-color:#fff;box-shadow:0 4px 12px rgba(255,80,100,.45)}
+.shop-list{flex:1;min-height:0;overflow-y:auto;display:grid;gap:9px;padding:2px 2px 6px;text-align:left}
+.shop-item{
+  display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-radius:18px;
+  background:rgba(255,255,255,.14);border:1.5px solid rgba(255,255,255,.3);
+}
+.shop-item.equipped{border-color:#ffd54a;box-shadow:0 0 14px rgba(255,213,74,.45)}
+.shop-name{font-weight:900;font-size:15px;line-height:1.15}
+.shop-desc{font-size:12px;font-weight:700;opacity:.8;margin-top:2px}
+.shop-btn{
+  min-width:92px;padding:9px 12px;border-radius:999px;font-size:14px;font-weight:900;color:#fff;white-space:nowrap;
+  background:linear-gradient(145deg,#ffa63d,#ff4f81);box-shadow:0 4px 0 #c2305f;transition:transform .12s,box-shadow .12s;
+}
+.shop-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #c2305f}
+.shop-btn.ad{background:linear-gradient(145deg,#6ecbff,#4a7bff);box-shadow:0 4px 0 #2f55c4}
+.shop-btn.ad:active{box-shadow:0 1px 0 #2f55c4}
+.shop-btn.own{background:linear-gradient(145deg,#38d97a,#13a85a);box-shadow:0 4px 0 #0d7a40}
+.shop-btn.own:active{box-shadow:0 1px 0 #0d7a40}
+.shop-btn.on{background:rgba(255,255,255,.2);box-shadow:none;border:1.5px solid #ffd54a;color:#ffe9a0;pointer-events:none}
+.shop-btn:disabled{opacity:.55;pointer-events:none}
+.shop-btn.poor{opacity:.65}
+.shop-card .big-btn{margin-top:10px;align-self:center;padding:11px 30px;font-size:18px}
+
+/* Vistas previas de la tienda: usan las MISMAS variables que el juego real */
+.pv{width:64px;height:64px;display:grid;place-items:center;position:relative}
+.pv-tile{
+  width:46px;height:46px;border-radius:24%;display:grid;place-items:center;font-weight:900;font-size:27px;
+  background:var(--tb-bg);background-size:var(--tb-size);animation:var(--tb-anim);
+  border:var(--tb-border);color:var(--tb-color);box-shadow:var(--tb-shadow);text-shadow:var(--tb-ts);
+}
+.pv-wheel{
+  width:60px;height:60px;border-radius:50%;position:relative;background:var(--wheel-bg);
+  box-shadow:0 4px 12px rgba(40,10,70,.4);animation:var(--ln-anim);
+}
+.pv-wheel svg{position:absolute;inset:0;width:100%;height:100%}
+.pv-wheel .g{fill:none;stroke:var(--ln-glow);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.pv-wheel .m{fill:none;stroke:var(--ln-main);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.pv-wheel i{position:absolute;width:15px;height:15px;border-radius:50%;background:var(--sel-bg);box-shadow:var(--sel-shadow)}
+.pv-wheel i:nth-of-type(1){left:6px;top:36px}
+.pv-wheel i:nth-of-type(2){left:22px;top:5px}
+.pv-wheel i:nth-of-type(3){left:39px;top:36px}
+
+@media (prefers-reduced-motion:reduce){
+  .sky,.cloud,.sun,.firefly,.star,.riverlines path,.aurora{animation:none}
+  .scene{transition:none}
+  .double-btn,#levelPill.boss,.coin-mark,.combo-badge.hot{animation:none}
+}
+</style>
+</head>
+
+<body>
+
+<!-- =======================================================================
+     FONDO DEL PAISAJE
+     ======================================================================= -->
+<div class="scene" aria-hidden="true">
+  <div class="sky"></div>
+  <div class="stars" id="stars"></div>
+  <div class="sun"></div>
+  <div class="aurora"></div>
+  <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+
+  <!-- Montañas, río y pinos: SVG que se ancla abajo y se recorta por los lados ("slice") -->
+  <svg class="landscape" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice">
+    <defs>
+      <!-- Los colores salen de variables CSS (ver "AMBIENTES DINÁMICOS") para poder cambiar de ambiente -->
+      <linearGradient id="mFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--mf0)"/><stop offset="1" style="stop-color:var(--mf1)"/></linearGradient>
+      <linearGradient id="mMid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--mm0)"/><stop offset="1" style="stop-color:var(--mm1)"/></linearGradient>
+      <linearGradient id="mNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--mn0)"/><stop offset="1" style="stop-color:var(--mn1)"/></linearGradient>
+      <linearGradient id="river" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--rv0)"/><stop offset=".45" style="stop-color:var(--rv1)"/><stop offset="1" style="stop-color:var(--rv2)"/></linearGradient>
+      <linearGradient id="snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2e6"/><stop offset="1" stop-color="#fff2e6" stop-opacity="0"/></linearGradient>
+    </defs>
+    <!-- Cordillera lejana con cumbres nevadas -->
+    <path fill="url(#mFar)" d="M0 470 L110 380 L200 430 L330 290 L450 410 L560 340 L690 450 L820 330 L940 420 L1060 300 L1190 410 L1300 350 L1440 430 L1440 900 L0 900Z"/>
+    <path fill="url(#snow)" opacity=".7" d="M330 290 L290 345 L330 330 L360 350Z M1060 300 L1020 355 L1060 340 L1095 360Z M820 330 L785 380 L820 365 L850 385Z"/>
+    <!-- Colinas medias -->
+    <path fill="url(#mMid)" d="M0 560 Q140 440 300 520 T600 500 T900 520 T1200 480 T1440 520 L1440 900 L0 900Z"/>
+    <!-- Río sinuoso que se ensancha hacia el espectador -->
+    <path fill="url(#river)" d="M690 510 C670 560 780 600 700 660 C640 705 600 790 540 900 L1000 900 C930 800 900 720 830 660 C770 610 800 570 750 510 Z"/>
+    <g class="riverlines">
+      <path d="M715 560 C720 620 700 680 660 760 S610 860 600 890"/>
+      <path d="M760 580 C770 640 800 700 850 770 S900 860 920 890"/>
+      <path d="M735 650 C740 720 740 800 730 890"/>
+    </g>
+    <!-- Colinas cercanas -->
+    <path fill="url(#mNear)" d="M0 700 Q120 600 260 660 T520 680 L560 900 L0 900Z"/>
+    <path fill="url(#mNear)" d="M1440 690 Q1320 590 1180 650 T930 680 L900 900 L1440 900Z"/>
+    <!-- Pinos (triángulos apilados) -->
+    <g style="fill:var(--tree)">
+      <g transform="translate(70 640)"><path d="M0 0 L40 120 H-40Z"/><path d="M0 -50 L32 70 H-32Z"/><path d="M0 -100 L24 20 H-24Z"/></g>
+      <g transform="translate(160 690) scale(.8)"><path d="M0 0 L40 120 H-40Z"/><path d="M0 -50 L32 70 H-32Z"/><path d="M0 -100 L24 20 H-24Z"/></g>
+      <g transform="translate(1360 630)"><path d="M0 0 L40 120 H-40Z"/><path d="M0 -50 L32 70 H-32Z"/><path d="M0 -100 L24 20 H-24Z"/></g>
+      <g transform="translate(1270 690) scale(.85)"><path d="M0 0 L40 120 H-40Z"/><path d="M0 -50 L32 70 H-32Z"/><path d="M0 -100 L24 20 H-24Z"/></g>
+      <g transform="translate(250 740) scale(.6)"><path d="M0 0 L40 120 H-40Z"/><path d="M0 -50 L32 70 H-32Z"/><path d="M0 -100 L24 20 H-24Z"/></g>
+    </g>
+  </svg>
+  <div id="fireflies"></div>
+  <div class="vignette"></div>
+</div>
+
+<canvas id="fx"></canvas>
+
+<!-- =======================================================================
+     INTERFAZ DEL JUEGO
+     ======================================================================= -->
+<main class="game">
+  <header class="topbar">
+    <div class="pill" id="levelPill">Nivel 1</div>
+    <!-- Píldora clicable: abre el modal con las palabras extra encontradas -->
+    <button class="pill grow" id="progressPill" aria-label="Ver palabras extra encontradas"><small>Palabras</small> <span id="progressTxt">0/0</span></button>
+    <div class="pill" id="coinPill">🪙 <span id="coins">0</span></div>
+    <button class="icon-btn" id="shopBtn" aria-label="Tienda de aspectos">🎨</button>
+    <button class="icon-btn" id="soundBtn" aria-label="Sonido">🔊</button>
+  </header>
+
+  <!-- Panel superior: el crucigrama -->
+  <section class="board-wrap" id="boardWrap"><div id="board"></div></section>
+
+  <!-- Burbuja con la palabra que se está formando -->
+  <div class="bubble-zone"><div id="bubble"></div><div class="combo-badge" id="comboBadge">🔥 x2</div></div>
+
+  <!-- Panel inferior: la rueda de letras -->
+  <section class="wheel-zone" id="wheelZone">
+    <button class="side-btn" id="hintBtn" aria-label="Pista (10 monedas)">💡<small>10</small></button>
+    <div id="wheel">
+      <svg id="lines" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="rainbowG" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="300" y2="300"><stop offset="0" stop-color="#4dffb0"/><stop offset=".35" stop-color="#4aa8ff"/><stop offset=".7" stop-color="#c77dff"/><stop offset="1" stop-color="#ff7ad9"/></linearGradient>
+          <filter id="glowF" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <polyline class="glow"  id="lineGlow"/>
+        <polyline class="main"  id="lineMain"/>
+        <polyline class="spark" id="lineSpark"/>
+      </svg>
+      <div id="letters"></div>
+      <button class="center-btn" id="shuffleBtn" aria-label="Mezclar letras">🔀</button>
+    </div>
+    <button class="side-btn" id="adBtn" aria-label="Ver anuncio y ganar 25 monedas">🎬<small>+25</small></button>
+  </section>
+</main>
+
+<!-- Pantalla genérica (título / nivel completado) -->
+<div class="overlay" id="overlay">
+  <div class="card">
+    <div class="icon" id="ovIcon">🌄</div>
+    <h1 id="ovTitle">Palabras Conectadas</h1>
+    <p id="ovText"></p>
+    <button class="big-btn" id="ovBtn">Jugar</button>
+    <button class="double-btn" id="doubleBtn" hidden>🎬 Duplicar +10 🪙</button>
+  </div>
+</div>
+
+<!-- Modal de palabras extra: se abre al pulsar la píldora superior de progreso -->
+<div class="overlay" id="bonusModal" role="dialog" aria-modal="true" aria-labelledby="bonusTitle">
+  <div class="card bonus-card">
+    <button class="close-btn" id="bonusClose" aria-label="Cerrar">✕</button>
+    <div class="icon">✨</div>
+    <h2 id="bonusTitle">Palabras extra</h2>
+    <p class="bonus-count" id="bonusCount"></p>
+    <div class="chips" id="bonusGrid"></div>
+    <p class="bonus-empty" id="bonusEmpty">Aún no has descubierto palabras extra en este nivel.<small>Prueba a combinar las letras de otras formas: cada extra te da +2 🪙</small></p>
+    <p class="bonus-foot" id="bonusFoot">Cada palabra extra da +2 🪙</p>
+    <button class="big-btn" id="bonusDone">Cerrar</button>
+  </div>
+</div>
+
+<!-- Tienda de aspectos: fichas y rayo/rueda -->
+<div class="overlay" id="shopModal" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+  <div class="card shop-card">
+    <button class="close-btn" id="shopClose" aria-label="Cerrar">✕</button>
+    <h2 id="shopTitle">🎨 Tienda de aspectos</h2>
+    <p class="shop-balance" id="shopBalance">Tus monedas: 🪙 <span id="shopCoins">0</span></p>
+    <div class="shop-tabs">
+      <button class="shop-tab active" data-tab="tile">Fichas</button>
+      <button class="shop-tab" data-tab="wheel">Rayo / Rueda</button>
+    </div>
+    <div class="shop-list" id="shopList"></div>
+    <button class="big-btn" id="shopDone">Cerrar</button>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   5. DATOS DE NIVELES + GENERADOR DE CRUCIGRAMAS
+   --------------------------------------------------------------------------
+   Para AÑADIR un nivel solo tienes que añadir un objeto al array LEVELS:
+     letters : las letras de la rueda (4 a 6, sin acentos, sin repetir si puedes)
+     words   : palabras que irán en el crucigrama (formadas con esas letras)
+     bonus   : palabras extra válidas que dan monedas pero no están en el tablero
+   El tablero se genera AUTOMÁTICAMENTE con buildCrossword(); las palabras que
+   no consigan encajar pasan a ser palabras "extra".
+   ========================================================================== */
+// <<GEN-START
+const LEVELS = [
+  // ==== Niveles 1-5 · Ambiente 0: ATARDECER ====
+  { letters: 'AMOR', words: ['AMOR', 'ROMA', 'MORA', 'RAMO', 'AMO', 'ARO'],
+    bonus: ['MAR', 'ORA'] },
+  { letters: 'COSTA', words: ['COSTA', 'CASO', 'COSA', 'SACO', 'CAOS', 'TOCA'],
+    bonus: ['ASCO', 'TOS', 'TACO', 'COTA', 'OCA', 'OSA', 'SOTA', 'TOSCA', 'CASTO'] },
+  { letters: 'VERANO', words: ['VERANO', 'VER', 'VANO', 'NAVE', 'VENA', 'VERA'],
+    bonus: ['ERA', 'AVE', 'RON', 'VARON', 'ARO', 'ORA', 'RENO', 'NEVAR', 'AVERNO'] },
+  { letters: 'CAMINO', words: ['CAMINO', 'MINA', 'MANO', 'CIMA', 'COMA', 'MIA', 'MONA'],
+    bonus: ['CON', 'AMO', 'MIO', 'ANIMO', 'CAMION', 'CAN', 'CANO', 'IMAN', 'OCA', 'ION',
+            'MICA', 'MICO', 'COIMA'] },
+  { letters: 'DESTINO', words: ['DESTINO', 'SINO', 'DIOS', 'DON', 'TENIS', 'NIETO', 'DOTE', 'NIDO'],  // ★ NIVEL JEFE
+    bonus: ['SON', 'SIN', 'ESO', 'NOS', 'DOS', 'ESTO', 'SENTIDO', 'TIO', 'TEN', 'SED',
+            'SENO', 'TOS', 'NETO', 'DENSO', 'TENSO', 'TON', 'ION', 'TINO', 'TIESO', 'TESON',
+            'SETO', 'TEDIO', 'TOSE', 'IDOS', 'NIDOS', 'DONES', 'NOTES', 'TENIDO', 'TEDIOS', 'SIENTO',
+            'DOTES', 'NIETOS', 'TINOS'] },
+
+  // ==== Niveles 6-10 · Ambiente 1: NOCHE ESTRELLADA ====
+  { letters: 'CANTO', words: ['CANTO', 'TOCA', 'NOTA', 'CANO', 'CAN', 'TACO'],
+    bonus: ['CON', 'TAN', 'COTA', 'OCA', 'TON', 'TACON'] },
+  { letters: 'BARCO', words: ['BARCO', 'OBRA', 'BOCA', 'CARO', 'ROCA', 'CABO'],
+    bonus: ['BAR', 'ARCO', 'COBRA', 'ARO', 'ORA', 'RABO', 'OCA', 'BOA', 'ORCA', 'BROCA'] },
+  { letters: 'SOMBRA', words: ['SOMBRA', 'AMOR', 'BROMA', 'ROSA', 'MAR', 'ROMA', 'RAMO'],
+    bonus: ['MAS', 'OBRA', 'AMBOS', 'AMO', 'BAR', 'SABOR', 'SOBRA', 'MORA', 'AMOS', 'ARO',
+            'ORA', 'RABO', 'OSA', 'RASO', 'BOA', 'MORSA', 'SOBA'] },
+  { letters: 'SALON', words: ['SALON', 'SANO', 'SOLA', 'SOL', 'SAL', 'LOSA'],
+    bonus: ['LOS', 'LAS', 'SON', 'NOS', 'SAN', 'OLA', 'LONA', 'OSA', 'ASNO'] },
+  { letters: 'LUCEROS', words: ['LUCEROS', 'CURSO', 'SUELO', 'CERO', 'SECO', 'SUERO', 'EURO', 'COL', 'SOL', 'OLER'],  // ★ NIVEL JEFE
+    bonus: ['LOS', 'SER', 'ESO', 'LES', 'USO', 'SUR', 'ROL', 'CRUEL', 'ECO', 'CUERO',
+            'COLE', 'LUCRO', 'RES', 'CLERO', 'CELO', 'SOLER', 'COSER', 'OLE', 'LUCERO', 'ROCE',
+            'SURCO', 'RECLUSO', 'OCRE', 'RULO', 'LUCES', 'CELOS', 'COLES', 'ROCES', 'OCRES'] },
+
+  // ==== Niveles 11-15 · Ambiente 2: AMANECER ====
+  { letters: 'SOLAR', words: ['SOLAR', 'ROSA', 'SOLA', 'SOL', 'ORAL', 'LOSA'],
+    bonus: ['LOS', 'LAS', 'SAL', 'ROL', 'OLA', 'ARO', 'ORA', 'OSA', 'RASO', 'ROSAL',
+            'ORLA'] },
+  { letters: 'FLORES', words: ['FLORES', 'SOL', 'SOLER', 'FLOR', 'OLER'],
+    bonus: ['LOS', 'SER', 'ESO', 'LES', 'ROL', 'FEO', 'RES', 'OLE', 'ELFO'] },
+  { letters: 'PAJARO', words: ['PAJARO', 'ROPA', 'PAR', 'RAJA', 'PAJA', 'ROJA', 'PARO'],
+    bonus: ['POR', 'PARA', 'AJO', 'ARA', 'JARA', 'ARO', 'ORA', 'PROA', 'AJA', 'ARPA',
+            'PAJAR'] },
+  { letters: 'AROMA', words: ['AROMA', 'AMOR', 'ROMA', 'AMAR', 'RAMA', 'ARMA'],
+    bonus: ['MAR', 'AMO', 'AMA', 'MORA', 'RAMO', 'ARA', 'ARO', 'ORA'] },
+  { letters: 'CORAZON', words: ['CORAZON', 'ZONA', 'RAZON', 'CORONA', 'ORO', 'CANO', 'ROCA', 'RONCA', 'ROZA', 'CAZO'],  // ★ NIVEL JEFE
+    bonus: ['CON', 'CARO', 'ARCO', 'CORO', 'CAN', 'RON', 'CONO', 'ARO', 'ORA', 'OCA',
+            'CORZO', 'ONZA', 'RONCO', 'ORCA', 'ZARCO', 'ARCON', 'CAZON', 'ROZAN'] },
+
+  // ==== Niveles 16-20 · Ambiente 3: AURORA BOREAL ====
+  { letters: 'ABRIGO', words: ['ABRIGO', 'RIO', 'GIRA', 'GIRO', 'OBRA', 'BOGA', 'RABO'],
+    bonus: ['BAR', 'IRA', 'OIR', 'ARO', 'AGRO', 'RIA', 'ORA', 'BOA', 'AGRIO', 'GARBO',
+            'BRIO'] },
+  { letters: 'VIENTO', words: ['VIENTO', 'VINO', 'ENVIO', 'NETO', 'VETO', 'TINO'],
+    bonus: ['TIO', 'TEN', 'NIETO', 'TON', 'ION'] },
+  { letters: 'ALTURA', words: ['ALTURA', 'RUTA', 'ALTAR', 'RATA', 'ALTA', 'AULA', 'TALA'],
+    bonus: ['TAL', 'ALA', 'ULTRA', 'LATA', 'ARA', 'AURA', 'ATA', 'TARA', 'ATAR', 'TALAR'] },
+  { letters: 'ESCALA', words: ['ESCALA', 'CASA', 'SALA', 'SACA', 'CALA', 'SECA', 'CELA'],
+    bonus: ['LAS', 'ESA', 'LES', 'CLASE', 'ACA', 'SAL', 'ALA', 'CAL', 'ASA', 'CASAL',
+            'ALCE', 'LACA'] },
+  { letters: 'CRISTAL', words: ['CRISTAL', 'RICA', 'LISTA', 'RISA', 'CASI', 'ISLA', 'CITAR', 'CITA', 'LIAR'],  // ★ NIVEL JEFE
+    bonus: ['LAS', 'ASI', 'TAL', 'TRAS', 'SALIR', 'SAL', 'TIA', 'TIRA', 'IRA', 'LISA',
+            'CAL', 'CRIA', 'RIA', 'LIRA', 'LATIR', 'LISTAR', 'ATRIL', 'ASIR', 'CITAS', 'LIRAS',
+            'RICAS'] },
+
+  // ==== Niveles 21-25 · Ambiente 4: BOSQUE MÁGICO ====
+  { letters: 'PRADO', words: ['PRADO', 'DAR', 'ROPA', 'PARO', 'PROA', 'PODA'],
+    bonus: ['POR', 'PAR', 'PARDO', 'ARO', 'ORA', 'ODA', 'PODAR'] },
+  { letters: 'ROBLES', words: ['ROBLES', 'SOL', 'BESO', 'SOLER', 'ORBE', 'ROBLE'],
+    bonus: ['LOS', 'SER', 'SOBRE', 'ESO', 'LES', 'ROL', 'RES', 'BOL', 'OLER', 'OLE',
+            'SEBO'] },
+  { letters: 'MADERO', words: ['MADERO', 'AMOR', 'MADRE', 'DAR', 'MODA', 'ROMA', 'MORA'],
+    bonus: ['ERA', 'MAR', 'RED', 'AMO', 'MERA', 'MERO', 'DEMORA', 'RAMO', 'ARO', 'ORA',
+            'REMO', 'MEAR', 'ODA', 'MAREO', 'DOMAR', 'DOMA'] },
+  { letters: 'PLANTA', words: ['PLANTA', 'PLAN', 'ALTA', 'PLATA', 'PLANA', 'LANA', 'TAPA'],
+    bonus: ['TAN', 'TAL', 'PAN', 'ALA', 'NATAL', 'PATA', 'LATA', 'PALA', 'ATA', 'TALA',
+            'NATA', 'APTA', 'PANAL', 'PATAN', 'NAPA'] },
+  { letters: 'ARBOLES', words: ['ARBOLES', 'BASE', 'OBRA', 'SABER', 'ROSA', 'SOLA', 'SOLAR', 'ROBLE', 'OLER', 'RABO'],  // ★ NIVEL JEFE
+    bonus: ['LOS', 'LAS', 'SER', 'SOBRE', 'ESO', 'ERA', 'ESA', 'LES', 'REAL', 'SOL',
+            'BOLSA', 'LABOR', 'ARBOL', 'SAL', 'BAR', 'ROL', 'SABOR', 'BESO', 'BOLA', 'SERA',
+            'OLA', 'ORAL', 'SOBRA', 'RES', 'BESAR', 'OSEA', 'BOL', 'ARO', 'ASEO', 'ORA',
+            'SOLER', 'SABLE', 'OLE', 'OSA', 'LOSA', 'RASO', 'ORBE', 'BREA', 'BOA', 'LOBA',
+            'ROSAL', 'BOREAL', 'ALERO', 'SABRE', 'SEBO', 'OBESA', 'SOLERA', 'ESLORA', 'SOBA', 'ORLA',
+            'BOLERA', 'SALERO', 'SALOBRE', 'BORLA', 'OBLEA', 'ALBOR', 'SOBAR'] },
+
+  // ==== Niveles 26-30 · Ambiente 5: DESIERTO DORADO ====
+  { letters: 'CALOR', words: ['CALOR', 'COLA', 'LOCA', 'ORAL', 'ROCA', 'CARO'],
+    bonus: ['CLARO', 'ROL', 'ARCO', 'OLA', 'COL', 'CAL', 'CORAL', 'ARO', 'ORA', 'OCA',
+            'COLAR', 'ORCA', 'ORLA'] },
+  { letters: 'ROCAS', words: ['ROCAS', 'COSA', 'ROSA', 'CASO', 'CARO', 'SACO'],
+    bonus: ['ROCA', 'ASCO', 'ARCO', 'CAOS', 'ARO', 'ORA', 'OCA', 'ROSCA', 'OSA', 'SACRO',
+            'RASO', 'CRASO', 'ORCA'] },
+  { letters: 'MIRAJE', words: ['MIRAJE', 'MIRA', 'AIRE', 'MAR', 'REJA', 'RIMA', 'MIA'],
+    bonus: ['ERA', 'IRA', 'MERA', 'RIA', 'MEAR', 'EMIR', 'AJI'] },
+  { letters: 'TESORO', words: ['TESORO', 'RESTO', 'ORO', 'ROTO', 'RETO', 'TORSO', 'TORO'],
+    bonus: ['SER', 'ESO', 'ESTO', 'OTRO', 'TRES', 'OSO', 'SORTEO', 'SOTO', 'TOS', 'RES',
+            'TOREO', 'OSEO', 'TOSER', 'SETO', 'TOSE'] },
+  { letters: 'CAMELLO', words: ['CAMELLO', 'CALLE', 'MAL', 'LOCAL', 'MALO', 'LOCA', 'COMA', 'LEAL', 'MELLA', 'CELA'],  // ★ NIVEL JEFE
+    bonus: ['ELLA', 'ELLO', 'AMO', 'COLA', 'ECO', 'OLA', 'LEMA', 'COLE', 'COL', 'CAL',
+            'OLLA', 'LOMA', 'CELO', 'OCA', 'OLE', 'MOLE', 'CALLO', 'CALMO', 'ALCE', 'LELO',
+            'LELA', 'CAMELO', 'LLAMO', 'LLAME'] },
+
+  // ==== Niveles 31-35 · Ambiente 6: OCÉANO PROFUNDO ====
+  { letters: 'OLAS', words: ['OLAS', 'SAL', 'SOL', 'OLA', 'OSA'],
+    bonus: ['LOS', 'LAS', 'SOLA', 'LOSA'] },
+  { letters: 'PERLAS', words: ['PERLAS', 'REAL', 'PASE', 'PESAR', 'PESA', 'PAR', 'SERA'],
+    bonus: ['LAS', 'SER', 'ERA', 'ESA', 'LES', 'SAL', 'PRESA', 'PERLA', 'RES', 'PERA',
+            'PELA', 'PELAR', 'LEPRA', 'PERAL', 'RAPE'] },
+  { letters: 'MAREA', words: ['MAREA', 'AREA', 'ARMA', 'RAMA', 'MERA', 'AMAR'],
+    bonus: ['ERA', 'MAR', 'AMA', 'ARA', 'MEAR'] },
+  { letters: 'MARINO', words: ['MARINO', 'MANO', 'MAR', 'ROMA', 'MORA', 'MIRA', 'MINA'],
+    bonus: ['AMOR', 'RIO', 'AMO', 'MIO', 'MIA', 'ANIMO', 'NORMA', 'IRA', 'OIR', 'RON',
+            'MONA', 'RAMO', 'ARO', 'IMAN', 'RIMA', 'RIA', 'ORA', 'ION', 'MINAR', 'NORIA',
+            'MIRON'] },
+  { letters: 'CORALES', words: ['CORALES', 'COSA', 'REAL', 'CASO', 'CLASE', 'SACO', 'SECA', 'CALOR', 'CAOS', 'ACERO'],  // ★ NIVEL JEFE
+    bonus: ['LOS', 'LAS', 'SER', 'ESO', 'ERA', 'ESA', 'LES', 'CLARO', 'SOL', 'SOLA',
+            'CAER', 'ROSA', 'CREA', 'COLA', 'CERO', 'LOCA', 'SAL', 'ROL', 'ESCOLAR', 'SOLAR',
+            'CARO', 'SERA', 'ROCA', 'ASCO', 'ARCO', 'CESAR', 'SECO', 'ECO', 'OLA', 'ORAL',
+            'COLE', 'COL', 'CAL', 'CASERO', 'CERA', 'COLERA', 'RES', 'CORAL', 'OSEA', 'CLERO',
+            'ARCE', 'CELOSA', 'ARO', 'OLER', 'CELO', 'ASEO', 'ORA', 'SOLER', 'COSER', 'OCA',
+            'OLE', 'SECAR', 'ROSCA', 'ROCE', 'OSA', 'SACRO', 'LOSA', 'RASO', 'CELA', 'ROSAL',
+            'COLAR', 'ALERO', 'CALERO', 'ALCE', 'CRASO', 'OCRE', 'ORCA', 'SOLERA', 'ESLORA', 'ORLA',
+            'SALERO', 'CAREO', 'CELAR', 'LACRE'] },
+
+  // ==== Niveles 36-40 · Ambiente 7: GALAXIA / NEBULOSA ====
+  { letters: 'ASTRO', words: ['ASTRO', 'RATO', 'ROSA', 'RASO', 'ROTA'],
+    bonus: ['OTRA', 'TRAS', 'TOS', 'ARO', 'ORA', 'OSA', 'SOTA', 'TARSO', 'OSTRA'] },
+  { letters: 'ORBITA', words: ['ORBITA', 'OBRA', 'TIRO', 'RATO', 'RITO', 'ATRIO', 'TIRA'],
+    bonus: ['OTRA', 'RIO', 'TIO', 'BAR', 'TIA', 'IRA', 'OIR', 'ROTA', 'TRIO', 'ARO',
+            'BOTA', 'RIA', 'ORA', 'RABO', 'BATIR', 'BOTAR', 'BOA', 'BROTA', 'BRIO'] },
+  { letters: 'COMETA', words: ['COMETA', 'TOME', 'TOMA', 'META', 'TEMA', 'COMA', 'TOCA'],
+    bonus: ['AMO', 'MATE', 'ECO', 'ETA', 'MOTA', 'TACO', 'COTA', 'ATEO', 'OCA', 'MOTE',
+            'CAMOTE', 'TECA'] },
+  { letters: 'TIERRA', words: ['TIERRA', 'ARTE', 'AIRE', 'REIR', 'TIRA', 'TIRAR'],
+    bonus: ['ERA', 'TRAER', 'TIA', 'IRA', 'ETA', 'RIA', 'RETAR'] },
+  { letters: 'PLANETA', words: ['PLANETA', 'ANTE', 'PLATA', 'PENA', 'PLAN', 'PENAL', 'TAPA', 'LENTA', 'LANA', 'PATA'],  // ★ NIVEL JEFE
+    bonus: ['TAN', 'TAL', 'ALTA', 'PAN', 'PLANTA', 'ETAPA', 'PLENA', 'TEN', 'ALA', 'TELA',
+            'NATAL', 'ETA', 'PLANA', 'PANEL', 'LATA', 'PALA', 'PALETA', 'ALETA', 'ATA', 'TALA',
+            'NATA', 'APTA', 'PELA', 'PANAL', 'PLATEA', 'ATEA', 'APENA', 'PATAN', 'PLANTE', 'NAPA',
+            'APNEA', 'PEANA'] },
+
+  // ==== Niveles 41-45 · Ambiente 8: VOLCÁN ÉPICO ====
+  { letters: 'CRATER', words: ['CRATER', 'TRAER', 'CAER', 'ARTE', 'RECTA', 'RETAR'],
+    bonus: ['ERA', 'CREAR', 'CREA', 'ETA', 'CERA', 'ARCE', 'CATRE', 'TECA'] },
+  { letters: 'CENIZA', words: ['CENIZA', 'CINE', 'ACNE', 'CENA', 'ZINC'],
+    bonus: ['CIEN', 'CAN', 'NECIA', 'ENCIA'] },
+  { letters: 'CARBON', words: ['CARBON', 'CABO', 'BOCA', 'ARCO', 'BANCO', 'CARO', 'CANO'],
+    bonus: ['CON', 'OBRA', 'BAR', 'BARCO', 'ROCA', 'CAN', 'COBRA', 'RON', 'BRONCA', 'BARON',
+            'ARO', 'ORA', 'RABO', 'OCA', 'BOA', 'RONCA', 'NABO', 'ORCA', 'BROCA', 'ARCON'] },
+  { letters: 'TREMOR', words: ['TREMOR', 'TORRE', 'METRO', 'TEMOR', 'MERO', 'TOME'],
+    bonus: ['RETO', 'REMO', 'RETRO', 'TERMO', 'MOTE', 'ROER'] },
+  { letters: 'CALDERA', words: ['CALDERA', 'CARA', 'AREA', 'REAL', 'CLARA', 'CADA', 'ALDEA', 'RED', 'ALARDE', 'ARCA'],  // ★ NIVEL JEFE
+    bonus: ['DEL', 'ERA', 'DAR', 'ACA', 'CAER', 'CREA', 'ALA', 'CAL', 'CELDA', 'CERA',
+            'ARA', 'ARCE', 'CADERA', 'ACERA', 'CALA', 'CERDA', 'LADERA', 'RADA', 'LACRA', 'CELA',
+            'LADRA', 'CALERA', 'ALCE', 'LACA', 'CALAR', 'CELADA', 'RALEA', 'CELAR', 'LACRE', 'ACLARE',
+            'CREADA'] },
+
+  // ==== Niveles 46-50 · Ambiente 9: CUMBRES NEVADAS ====
+  { letters: 'MONTES', words: ['MONTES', 'MENOS', 'MES', 'TOME', 'NETO', 'TENSO', 'SENO'],
+    bonus: ['SON', 'ESO', 'NOS', 'ESTO', 'MONTE', 'TEN', 'TOS', 'TON', 'MOTE', 'MESON',
+            'TESON', 'SETO', 'TOSE'] },
+  { letters: 'ALPINO', words: ['ALPINO', 'PALO', 'PLAN', 'PAN', 'PILA', 'LONA', 'PINO'],
+    bonus: ['PLANO', 'OLA', 'PIANO', 'LIO', 'PIO', 'LINO', 'ION', 'APIO', 'NOPAL', 'PILON'] },
+  { letters: 'CRESTA', words: ['CRESTA', 'CESAR', 'SERA', 'ARTE', 'RECTA', 'RESTA', 'ARCE'],
+    bonus: ['ESTA', 'SER', 'ERA', 'ESA', 'ESTAR', 'TRES', 'TRAS', 'CAER', 'CREA', 'SECA',
+            'ETA', 'CERA', 'RES', 'SECTA', 'CESTA', 'SECAR', 'SETA', 'CATRE', 'TECA', 'TERSA',
+            'ASTER'] },
+  { letters: 'NEVADO', words: ['NEVADO', 'ONDA', 'NAVE', 'VANO', 'VEDA', 'VENA'],
+    bonus: ['DON', 'AVE', 'VENDO', 'VENDA', 'VENADO', 'ODA'] },
+  { letters: 'CAMPEON', words: ['CAMPEON', 'CAMPO', 'PENA', 'AMO', 'POCA', 'MANO', 'COPA', 'EPOCA', 'PAN', 'PEON'],  // ★ NIVEL JEFE
+    bonus: ['CON', 'CENA', 'ONCE', 'POEMA', 'ECO', 'CAN', 'COMA', 'MONA', 'CANO', 'MENA',
+            'OCA', 'CEPA', 'ACNE', 'AMENO', 'PECA', 'CEPO', 'POMA', 'CAPON'] },
+];
+
+/**
+ * Genera un crucigrama a partir de una lista de palabras (algoritmo voraz).
+ *  1) Coloca la palabra más larga en horizontal.
+ *  2) Para cada palabra restante busca todos los cruces posibles con letras ya colocadas.
+ *  3) Descarta posiciones que toquen otras palabras lateralmente (formarían palabras falsas).
+ *  4) Se queda con la posición que más cruces tenga y que deje el tablero más compacto.
+ * Devuelve { words, cells, cols, rows, dropped }.
+ */
+function buildCrossword(wordList) {
+  const grid = new Map();          // "x,y" -> { ch, dirs:Set('H'|'V') }
+  const placed = [];               // { word, x, y, dir }
+  const key = (x, y) => x + ',' + y;
+  const words = [...wordList].sort((a, b) => b.length - a.length || a.localeCompare(b));
+
+  // Devuelve nº de cruces si la palabra cabe en (x,y,dir), o -1 si es inválida
+  function check(word, x, y, dir) {
+    const dx = dir === 'H' ? 1 : 0, dy = dir === 'V' ? 1 : 0;
+    if (grid.has(key(x - dx, y - dy)) || grid.has(key(x + word.length * dx, y + word.length * dy))) return -1;
+    let cross = 0;
+    for (let k = 0; k < word.length; k++) {
+      const cx = x + k * dx, cy = y + k * dy, cell = grid.get(key(cx, cy));
+      if (cell) {
+        if (cell.ch !== word[k] || cell.dirs.has(dir)) return -1; // letra distinta o solapa misma dirección
+        cross++;
+      } else if (grid.has(key(cx + dy, cy + dx)) || grid.has(key(cx - dy, cy - dx))) {
+        return -1;                                                // tocaría otra palabra por un lado
+      }
+    }
+    return cross;
+  }
+  function put(word, x, y, dir) {
+    const dx = dir === 'H' ? 1 : 0, dy = dir === 'V' ? 1 : 0;
+    for (let k = 0; k < word.length; k++) {
+      const kk = key(x + k * dx, y + k * dy);
+      let cell = grid.get(kk);
+      if (!cell) { cell = { ch: word[k], dirs: new Set() }; grid.set(kk, cell); }
+      cell.dirs.add(dir);
+    }
+    placed.push({ word, x, y, dir });
+  }
+  // Tamaño del tablero si añadimos esta palabra (para preferir tableros compactos)
+  function sizeWith(word, x, y, dir) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const all = placed.concat([{ word, x, y, dir }]);
+    for (const p of all) {
+      x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+      x1 = Math.max(x1, p.x + (p.dir === 'H' ? p.word.length - 1 : 0));
+      y1 = Math.max(y1, p.y + (p.dir === 'V' ? p.word.length - 1 : 0));
+    }
+    return { w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  }
+
+  put(words[0], 0, 0, 'H');
+  let pending = words.slice(1), progress = true;
+  while (pending.length && progress) {
+    progress = false;
+    for (const word of [...pending]) {
+      let best = null;
+      for (const p of placed) {
+        const dir = p.dir === 'H' ? 'V' : 'H';
+        for (let i = 0; i < word.length; i++) for (let j = 0; j < p.word.length; j++) {
+          if (word[i] !== p.word[j]) continue;
+          const x = p.dir === 'H' ? p.x + j : p.x - i;
+          const y = p.dir === 'H' ? p.y - i : p.y + j;
+          const c = check(word, x, y, dir);
+          if (c < 1) continue;
+          const s = sizeWith(word, x, y, dir);
+          const score = c * 50 - s.w * s.h - Math.abs(s.w - s.h) * 3;
+          if (!best || score > best.score) best = { x, y, dir, score };
+        }
+      }
+      if (best) { put(word, best.x, best.y, best.dir); pending = pending.filter(w => w !== word); progress = true; }
+    }
+  }
+
+  // Normalizamos coordenadas para que empiecen en (0,0)
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const k of grid.keys()) {
+    const [x, y] = k.split(',').map(Number);
+    minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+  }
+  const cells = new Map();
+  for (const [k, c] of grid) {
+    const [x, y] = k.split(',').map(Number);
+    cells.set((x - minX) + ',' + (y - minY), { x: x - minX, y: y - minY, ch: c.ch });
+  }
+  const outWords = placed.map(p => {
+    const dx = p.dir === 'H' ? 1 : 0, dy = p.dir === 'V' ? 1 : 0, keys = [];
+    for (let k = 0; k < p.word.length; k++) keys.push((p.x - minX + k * dx) + ',' + (p.y - minY + k * dy));
+    return { word: p.word, dir: p.dir, cells: keys };
+  });
+  return { words: outWords, cells, cols: maxX - minX + 1, rows: maxY - minY + 1, dropped: pending };
+}
+// <<GEN-END
+
+/* ==========================================================================
+   6. UTILIDADES, ESTADO Y GUARDADO
+   ========================================================================== */
+const $ = s => document.querySelector(s);
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+const COIN_REWARD_LEVEL = 10;   // monedas al completar nivel
+const COIN_REWARD_BONUS = 2;    // monedas por palabra extra
+const HINT_COST = 10;           // coste de la pista
+const SAVE_KEY = 'palabras-conectadas.v1';
+const COIN_REWARD_BOSS = 30;    // monedas al completar un nivel Jefe (cada 5 niveles)
+const TREASURE_REWARD = 3;      // monedas por casilla con tesoro
+const COMBO_MIN = 3;            // combo a partir del cual hay monedas extra
+const COMBO_BONUS = 2;          // monedas extra por acierto con combo >= COMBO_MIN
+const isBoss = i => (i + 1) % 5 === 0;
+
+const state = {
+  levelIndex: 0,
+  coins: 30,               // monedas iniciales (para poder probar la pista)
+  layout: null,            // resultado de buildCrossword
+  wordSet: new Set(),      // palabras del tablero
+  bonusSet: new Set(),     // palabras extra válidas
+  found: new Set(),        // palabras del tablero ya encontradas
+  bonusFound: new Set(),   // extras ya encontradas
+  revealed: new Set(),     // casillas ya reveladas ("x,y")
+  letters: [],             // letras de la rueda (índice = id)
+  slots: [],               // slots[id] = posición angular actual de esa letra
+  centers: [],             // centers[id] = {x,y} en píxeles dentro de la rueda
+  letterSize: 60,
+  wheelSize: 300,
+  selected: [],            // ids de letras seleccionadas, en orden
+  dragging: false,
+  locked: false,           // true mientras se muestra la pantalla de victoria
+  sound: true,
+  combo: 0,                // racha actual de aciertos
+  treasures: new Set(),    // casillas con tesoro aún sin descubrir
+  owned: { classic: true, solar: true },   // aspectos comprados (ids)
+  equip: { tile: 'classic', wheel: 'solar' },
+  adProg: {},              // anuncios vistos por aspecto (id -> n)
+};
+const cellEls = new Map();  // "x,y" -> elemento DOM de la casilla
+
+function saveGame() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ level: state.levelIndex, coins: state.coins, owned: state.owned, equip: state.equip, adProg: state.adProg })); } catch (e) {}
+}
+function loadGame() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (d) {
+      state.levelIndex = Math.min(d.level | 0, LEVELS.length - 1); state.coins = d.coins | 0;
+      if (d.owned && typeof d.owned === 'object') Object.assign(state.owned, d.owned);
+      if (d.adProg && typeof d.adProg === 'object') state.adProg = d.adProg;
+      if (d.equip && typeof d.equip === 'object') ['tile', 'wheel'].forEach(kind => {
+        const it = SHOP[kind].find(x => x.id === d.equip[kind]);
+        if (it && isOwned(it)) state.equip[kind] = it.id;      // solo equipamos lo que realmente se posee
+      });
+    }
+  } catch (e) {}
+}
+
+/* ==========================================================================
+   7. SONIDO (Web Audio: se generan tonos, no hacen falta archivos)
+   ========================================================================== */
+let actx = null;
+function ensureAudio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function tone(freq, dur = .15, type = 'sine', vol = .14, delay = 0) {
+  if (!state.sound || !actx) return;
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + .012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t); o.stop(t + dur + .03);
+}
+const SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66];   // escala pentatónica (suena bien siempre)
+const sfx = {
+  select: n => tone(SCALE[Math.min(n, SCALE.length - 1)], .13, 'triangle', .13),
+  ok:     () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .28, 'triangle', .14, i * .07)),
+  bonus:  () => [784, 988, 1319].forEach((f, i) => tone(f, .22, 'sine', .15, i * .08)),
+  bad:    () => { tone(190, .2, 'sawtooth', .07); tone(140, .26, 'sawtooth', .07, .09); },
+  dup:    () => { tone(440, .1, 'square', .06); tone(440, .1, 'square', .06, .13); },
+  flip:   () => tone(900 + rand(0, 300), .08, 'sine', .06),
+  shuffle:() => [400, 500, 620].forEach((f, i) => tone(f, .08, 'sine', .08, i * .04)),
+  hint:   () => [660, 880].forEach((f, i) => tone(f, .2, 'sine', .12, i * .1)),
+  win:    () => [523, 659, 784, 1047, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, .3, 'triangle', .15, i * .11)),
+};
+
+/* ==========================================================================
+   8. PARTÍCULAS (canvas): destellos al acertar y confeti al ganar
+   ========================================================================== */
+const fx = $('#fx'), fctx = fx.getContext('2d');
+let parts = [], fxRaf = 0;
+function resizeFx() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  fx.width = innerWidth * dpr; fx.height = innerHeight * dpr;
+  fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+const SPARK_COLORS = ['#fff6b0', '#ffd479', '#ff9a3c', '#ff4f81', '#ffffff', '#9be7ff'];
+const GOLD_COLORS = ['#ffd54a', '#ffe27a', '#fff6b0', '#ffb02e', '#ffffff'];
+function burst(x, y, n = 16, colors = SPARK_COLORS) {                    // explosión de chispas en un punto
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), s = rand(2, 6);
+    parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 2, g: .12, life: 1, decay: rand(.014, .028),
+      size: rand(3, 7), color: pick(colors), kind: 'spark' });
+  }
+  startFx();
+}
+function confetti() {                             // lluvia de confeti desde arriba
+  for (let i = 0; i < 160; i++) {
+    parts.push({ x: rand(0, innerWidth), y: rand(-80, -10), vx: rand(-1.5, 1.5), vy: rand(2, 6), g: .05,
+      life: 1, decay: rand(.004, .008), size: rand(6, 11), color: pick(SPARK_COLORS.concat(['#6ecbff', '#38d97a'])),
+      kind: 'conf', rot: rand(0, 6), vr: rand(-.2, .2) });
+  }
+  startFx();
+}
+function startFx() { if (!fxRaf) fxRaf = requestAnimationFrame(fxLoop); }
+function fxLoop() {
+  fctx.clearRect(0, 0, innerWidth, innerHeight);
+  parts = parts.filter(p => p.life > 0 && p.y < innerHeight + 30);
+  for (const p of parts) {
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+    fctx.globalAlpha = Math.max(p.life, 0); fctx.fillStyle = p.color;
+    if (p.kind === 'spark') {                     // estrella de 4 puntas
+      const s = p.size * (0.5 + p.life * .6);
+      fctx.beginPath();
+      fctx.moveTo(p.x, p.y - s); fctx.quadraticCurveTo(p.x, p.y, p.x + s, p.y);
+      fctx.quadraticCurveTo(p.x, p.y, p.x, p.y + s); fctx.quadraticCurveTo(p.x, p.y, p.x - s, p.y);
+      fctx.quadraticCurveTo(p.x, p.y, p.x, p.y - s); fctx.fill();
+    } else {                                      // trocito de confeti girando
+      p.rot += p.vr; fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot);
+      fctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2); fctx.restore();
+    }
+  }
+  fctx.globalAlpha = 1;
+  fxRaf = parts.length ? requestAnimationFrame(fxLoop) : 0;
+  if (!parts.length) fctx.clearRect(0, 0, innerWidth, innerHeight);
+}
+
+/* ==========================================================================
+   9. MENSAJES FLOTANTES
+   ========================================================================== */
+const PRAISE = ['¡Genial!', '¡Fantástico!', '¡Increíble!', '¡Excelente!', '¡Perfecto!', '¡Bien hecho!'];
+function toast(text, kind = '', dy = 0) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind; el.textContent = text;
+  const r = $('#boardWrap').getBoundingClientRect();
+  el.style.top = (r.top + r.height * 0.38 + dy) + 'px';
+  if (document.querySelector('.overlay.show')) el.style.zIndex = 90;   // visible también por encima de modales
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1400);
+}
+
+/* ==========================================================================
+   10. TABLERO (crucigrama superior)
+   ========================================================================== */
+function renderBoard() {
+  const board = $('#board'); board.innerHTML = ''; cellEls.clear();
+  const { cells, cols, rows } = state.layout;
+  board.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`;
+  board.style.gridTemplateRows = `repeat(${rows}, var(--cell))`;
+  let i = 0;
+  for (const [k, c] of cells) {
+    const el = document.createElement('div');
+    el.className = 'cell';
+    el.style.gridColumn = c.x + 1; el.style.gridRow = c.y + 1;
+    el.style.setProperty('--d', (i++ * 0.04) + 's');         // aparición escalonada
+    el.innerHTML = `<div class="tile"><div class="face front"></div><div class="face back">${c.ch}</div></div>`;
+    board.appendChild(el); cellEls.set(k, el);
+  }
+  fitBoard();
+}
+/** Calcula el tamaño de casilla para que el crucigrama siempre quepa en su panel */
+function fitBoard() {
+  if (!state.layout) return;
+  const wrap = $('#boardWrap'), gap = 6;
+  const w = wrap.clientWidth - 26, h = wrap.clientHeight - 26;
+  const { cols, rows } = state.layout;
+  const size = Math.floor(Math.min((w - gap * (cols - 1)) / cols, (h - gap * (rows - 1)) / rows));
+  document.documentElement.style.setProperty('--cell', Math.max(24, Math.min(58, size)) + 'px');
+}
+/** Revela casillas con volteo + rebote + chispas (stagger = retardo entre casillas) */
+function revealCells(keys, stagger = 110, viaHint = false) {
+  let n = 0;
+  for (const k of keys) {
+    if (state.revealed.has(k)) continue;
+    state.revealed.add(k);
+    const el = cellEls.get(k), delay = n++ * stagger;
+    const hasTreasure = state.treasures.has(k);                // tesoro: solo da premio si NO se revela con pista
+    if (hasTreasure) state.treasures.delete(k);
+    const win = hasTreasure && !viaHint;
+    setTimeout(() => {
+      el.classList.add('revealed'); sfx.flip();
+      if (win) collectTreasure(el);
+      setTimeout(() => {                                     // rebote cuando termina el giro
+        el.classList.add('bounce');
+        el.addEventListener('animationend', () => el.classList.remove('bounce'), { once: true });
+        const r = el.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, 10);
+      }, 330);
+    }, delay);
+  }
+  return n * stagger;
+}
+/** Marca como encontradas las palabras cuyas casillas están todas reveladas (también por cruces) */
+function markCompleted() {
+  for (const w of state.layout.words)
+    if (!state.found.has(w.word) && w.cells.every(k => state.revealed.has(k))) state.found.add(w.word);
+  updateHud();
+}
+function pulseWord(word) {
+  const w = state.layout.words.find(x => x.word === word); if (!w) return;
+  w.cells.forEach((k, i) => setTimeout(() => {
+    const el = cellEls.get(k); el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+    setTimeout(() => el.classList.remove('pulse'), 750);
+  }, i * 60));
+}
+
+/* ==========================================================================
+   11. RUEDA DE LETRAS
+   ========================================================================== */
+function buildWheel() {
+  const box = $('#letters'); box.innerHTML = '';
+  state.letters.forEach((ch, id) => {
+    const el = document.createElement('div');
+    el.className = 'letter'; el.textContent = ch; el.dataset.id = id;
+    box.appendChild(el);
+  });
+  state.slots = state.letters.map((_, i) => i);
+  layoutWheel();
+}
+/** Dimensiona la rueda y coloca cada letra en su ranura circular */
+function layoutWheel() {
+  const size = Math.round(Math.max(190, Math.min(innerWidth - 40, innerHeight * 0.36, 330)));
+  state.wheelSize = size;
+  const wheel = $('#wheel');
+  document.documentElement.style.setProperty('--wheel', size + 'px');
+  $('#lines').setAttribute('viewBox', `0 0 ${size} ${size}`);
+  const rg = $('#rainbowG'); rg.setAttribute('x2', size); rg.setAttribute('y2', size);   // el degradado arcoíris abarca toda la rueda
+  const n = state.letters.length, ls = Math.round(size * (n >= 7 ? .185 : n > 5 ? .2 : .23));   // 7+ letras: fichas algo menores para que no se pisen
+  state.letterSize = ls;
+  const R = size / 2 - ls / 2 - size * 0.045;
+  state.centers = [];
+  [...$('#letters').children].forEach(el => {
+    const id = +el.dataset.id, a = (-90 + 360 * state.slots[id] / n) * Math.PI / 180;
+    const cx = size / 2 + R * Math.cos(a), cy = size / 2 + R * Math.sin(a);
+    state.centers[id] = { x: cx, y: cy };
+    el.style.setProperty('--ls', ls + 'px');
+    el.style.width = el.style.height = ls + 'px';
+    el.style.left = (cx - ls / 2) + 'px'; el.style.top = (cy - ls / 2) + 'px';
+  });
+  drawLines();
+}
+function shuffleLetters() {
+  ensureAudio();
+  const n = state.letters.length;
+  let perm;
+  do {                                                       // Fisher–Yates; evitamos devolver la misma disposición
+    perm = [...Array(n).keys()];
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+  } while (n > 2 && perm.every((v, i) => v === state.slots[i]));
+  state.slots = perm; layoutWheel(); sfx.shuffle();
+  const b = $('#shuffleBtn'); b.classList.remove('spin'); void b.offsetWidth; b.classList.add('spin');
+}
+
+/* ---- Selección con ratón/dedo (Pointer Events: sirve para ambos) ---- */
+const wheelEl = $('#wheel');
+let pointer = null;                                           // última posición del puntero dentro de la rueda
+function localPos(e) { const r = wheelEl.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+/** Devuelve el id de la letra bajo el puntero (o -1) */
+function hitLetter(p) {
+  let best = -1, bestD = state.letterSize * 0.55;
+  state.centers.forEach((c, id) => { const d = Math.hypot(c.x - p.x, c.y - p.y); if (d < bestD) { bestD = d; best = id; } });
+  return best;
+}
+function selectLetter(id) {
+  state.selected.push(id);
+  $('#letters').children[id].classList.add('sel');
+  sfx.select(state.selected.length - 1);
+  renderBubble(); drawLines();
+}
+function deselectLast() {
+  const id = state.selected.pop();
+  $('#letters').children[id].classList.remove('sel');
+  sfx.select(Math.max(state.selected.length - 1, 0));
+  renderBubble();
+}
+wheelEl.addEventListener('pointerdown', e => {
+  if (state.locked) return;
+  ensureAudio();
+  const p = localPos(e), id = hitLetter(p);
+  if (id < 0) return;                                         // pulsó fuera de una letra (p. ej. botón central)
+  e.preventDefault(); wheelEl.setPointerCapture(e.pointerId);
+  clearResultClasses(); state.dragging = true; state.selected = []; pointer = p;
+  selectLetter(id);
+});
+wheelEl.addEventListener('pointermove', e => {
+  if (!state.dragging) return;
+  pointer = localPos(e);
+  const id = hitLetter(pointer), sel = state.selected;
+  if (id >= 0) {
+    if (!sel.includes(id)) selectLetter(id);                                  // añade letra nueva
+    else if (sel.length > 1 && sel[sel.length - 2] === id) deselectLast();    // volver atrás = quitar la última
+  }
+  drawLines();
+});
+const endDrag = () => { if (state.dragging) { state.dragging = false; pointer = null; finishSelection(); } };
+wheelEl.addEventListener('pointerup', endDrag);
+wheelEl.addEventListener('pointercancel', endDrag);
+
+/** Dibuja la línea luminosa: letras seleccionadas + cola hasta el puntero */
+function drawLines() {
+  const pts = state.selected.map(id => state.centers[id]);
+  let str = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  if (state.dragging && pointer && pts.length) str += ` ${pointer.x.toFixed(1)},${pointer.y.toFixed(1)}`;
+  ['lineGlow', 'lineMain', 'lineSpark'].forEach(i => $('#' + i).setAttribute('points', pts.length ? str : ''));
+}
+function renderBubble() {
+  const b = $('#bubble'), word = state.selected.map(id => state.letters[id]).join('');
+  b.textContent = word; b.classList.toggle('show', !!word);
+}
+function clearResultClasses() {
+  ['ok', 'bonus', 'bad', 'dup'].forEach(c => { $('#bubble').classList.remove(c); wheelEl.classList.remove(c); });
+}
+
+/* ==========================================================================
+   12. LÓGICA DE JUEGO: comprobar la palabra al soltar
+   ========================================================================== */
+function finishSelection() {
+  const word = state.selected.map(id => state.letters[id]).join('');
+  const result = submitWord(word);
+  if (result !== 'none') { $('#bubble').classList.add(result); wheelEl.classList.add(result); }
+  // Dejamos la línea y la burbuja un momento para que se vea el color del resultado
+  setTimeout(() => {
+    state.selected = [];
+    [...$('#letters').children].forEach(el => el.classList.remove('sel'));
+    renderBubble(); drawLines(); clearResultClasses();
+  }, result === 'none' ? 0 : 450);
+}
+function submitWord(word) {
+  if (word.length < 2) return 'none';
+
+  if (state.wordSet.has(word)) {
+    if (state.found.has(word)) { pulseWord(word); toast('Ya la tienes', 'info'); sfx.dup(); return 'dup'; }
+    const w = state.layout.words.find(x => x.word === word);
+    const t = revealCells(w.cells);                           // volteo de casillas
+    markCompleted();
+    sfx.ok(); toast(word.length >= 5 ? pick(PRAISE.slice(1)) : pick(PRAISE));
+    comboHit();
+    setTimeout(checkLevelComplete, t + 900);
+    return 'ok';
+  }
+  if (state.bonusSet.has(word)) {
+    if (state.bonusFound.has(word)) { toast('Extra repetida', 'info'); sfx.dup(); return 'dup'; }
+    state.bonusFound.add(word); setCoins(state.coins + COIN_REWARD_BONUS);
+    sfx.bonus(); toast(`¡Extra! +${COIN_REWARD_BONUS} 🪙`, 'bonus');
+    comboHit();
+    const r = $('#coinPill').getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, 14);
+    updateHud(); return 'bonus';
+  }
+  sfx.bad(); if (word.length >= 3) loseCombo(); return 'bad';
+}
+
+/* ---- Pista: revela una casilla al azar ---- */
+function useHint() {
+  if (state.locked) return;
+  ensureAudio();
+  if (state.coins < HINT_COST) { toast(`Necesitas ${HINT_COST} 🪙`, 'info'); sfx.bad(); bump('#coinPill'); return; }
+  const hidden = [...state.layout.cells.keys()].filter(k => !state.revealed.has(k));
+  if (!hidden.length) return;
+  setCoins(state.coins - HINT_COST); sfx.hint();
+  const pool = hidden.filter(k => !state.treasures.has(k));   // preferimos no "quemar" un tesoro con la pista
+  const t = revealCells([pick(pool.length ? pool : hidden)], 110, true);
+  markCompleted(); saveGame();
+  setTimeout(checkLevelComplete, t + 900);
+}
+
+/* ---- Anuncio recompensado (SIMULADO) ----
+   Esta es la zona que conectarás al SDK real (CrazyGames, Poki...).
+   Solo tienes que sustituir el cuerpo de requestRewardedAd(): llama a tu SDK y, según el resultado,
+   ejecuta onDone() (el jugador vio el anuncio entero) u onError() (no hay anuncio / se canceló).
+   Ejemplo CrazyGames:
+     window.CrazyGames.SDK.ad.requestAd('rewarded', { adFinished: onDone, adError: onError, adStarted(){} });
+*/
+const AD_REWARD = 25;          // monedas por ver un anuncio
+const AD_FAKE_DURATION = 2000; // ms que dura el anuncio simulado
+let adPlaying = false;         // evita lanzar dos anuncios a la vez
+
+function requestRewardedAd(onDone, onError) {
+  setTimeout(onDone, AD_FAKE_DURATION);       // ← SIMULACIÓN: sustituir por la llamada al SDK
+}
+/** Anuncio recompensado genérico (tienda y duplicar premio). No toca state.locked. Devuelve false si ya hay uno en curso. */
+function playAd(onRewarded, onFail) {
+  if (adPlaying) return false;
+  adPlaying = true;
+  requestRewardedAd(
+    () => { adPlaying = false; onRewarded(); },
+    () => { adPlaying = false; if (onFail) onFail(); }
+  );
+  return true;
+}
+function watchRewardedAd() {
+  if (state.locked || adPlaying) return;      // ya hay una pantalla/anuncio activo
+  ensureAudio();
+  adPlaying = true; state.locked = true;      // bloquea rueda, pista y mezcla durante el anuncio
+  $('#adBtn').classList.add('busy');
+  toast('Reproduciendo anuncio…', 'info');
+
+  const finish = rewarded => {
+    adPlaying = false; state.locked = false;  // desbloquea la interfaz
+    $('#adBtn').classList.remove('busy');
+    if (rewarded) {
+      setCoins(state.coins + AD_REWARD);      // setCoins ya guarda la partida
+      sfx.bonus();
+      const r = $('#coinPill').getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, 18);
+      toast('¡Recompensa obtenida!', 'bonus');
+    } else {
+      toast('Anuncio no disponible', 'info'); sfx.bad();
+    }
+    checkLevelComplete();                     // por si el nivel se completó justo mientras sonaba el anuncio
+  };
+  requestRewardedAd(() => finish(true), () => finish(false));
+}
+
+/* ==========================================================================
+   13. NIVELES: carga, victoria y avance
+   ========================================================================== */
+/* ---- Ambientes: el fondo cambia cada 5 niveles (ver "AMBIENTES DINÁMICOS" en el CSS) ---- */
+const THEMES = [
+  { name: 'Atardecer',        icon: '🌇', color: '#4a2a6b' },   // niveles 1-5
+  { name: 'Noche estrellada', icon: '🌙', color: '#14205a' },   // niveles 6-10
+  { name: 'Amanecer',         icon: '🌅', color: '#6a9fdc' },   // niveles 11-15
+  { name: 'Aurora boreal',    icon: '✨', color: '#0b4a4e' },   // niveles 16-20
+  { name: 'Bosque mágico',    icon: '🌲', color: '#0f4a34' },   // niveles 21-25
+  { name: 'Desierto dorado',  icon: '🏜️', color: '#b8742a' },   // niveles 26-30
+  { name: 'Océano profundo',  icon: '🌊', color: '#04304f' },   // niveles 31-35
+  { name: 'Galaxia nebulosa', icon: '🌌', color: '#3a0f78' },   // niveles 36-40
+  { name: 'Volcán épico',     icon: '🌋', color: '#6a1410' },   // niveles 41-45
+  { name: 'Cumbres nevadas',  icon: '🏔️', color: '#2c5a8f' },   // niveles 46-50
+];
+let currentTheme = -1;
+function setTheme(levelIndex) {
+  const t = Math.floor(levelIndex / 5) % THEMES.length;       // % por si algún día añades más de 20 niveles
+  if (t === currentTheme) return;
+  const first = currentTheme === -1;
+  currentTheme = t;
+  $('.scene').dataset.theme = t;                              // el CSS hace el fundido de colores
+  $('meta[name="theme-color"]').setAttribute('content', THEMES[t].color);
+  if (!first) setTimeout(() => toast(`${THEMES[t].icon} ${THEMES[t].name}`, 'info'), 700);
+}
+
+/* ---- Modal de palabras extra ---- */
+function openBonusModal() {
+  ensureAudio(); sfx.flip();
+  // Ordenadas por longitud y luego alfabéticamente
+  const words = [...state.bonusFound].sort((a, b) => a.length - b.length || a.localeCompare(b));
+  const grid = $('#bonusGrid'); grid.innerHTML = '';
+  words.forEach((w, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'chip'; chip.textContent = w;
+    chip.style.setProperty('--d', (i * 0.05) + 's');          // aparición escalonada
+    grid.appendChild(chip);
+  });
+  const any = words.length > 0;
+  grid.style.display = any ? '' : 'none';
+  $('#bonusFoot').style.display = any ? '' : 'none';
+  $('#bonusEmpty').style.display = any ? 'none' : '';         // mensaje cuando aún no hay ninguna
+  $('#bonusCount').textContent = `${words.length} de ${state.bonusSet.size} encontradas`;
+  $('#bonusModal').classList.add('show');
+  $('#bonusDone').focus();
+}
+function closeBonusModal() { $('#bonusModal').classList.remove('show'); }
+
+/* ==========================================================================
+   13b. FASE A: TIENDA DE ASPECTOS, TESOROS, COMBO Y DUPLICAR PREMIO
+   ========================================================================== */
+
+/* ---- Catálogo de la tienda ----
+   cost : precio en monedas      ads : nº de anuncios que hay que ver (alternativa a las monedas)
+   Para añadir un aspecto: crea su bloque CSS (body[data-tile="x"] / body[data-wheel="x"] + .pv[data-skin="x"])
+   y añade aquí una entrada con el mismo id. */
+const SHOP = {
+  tile: [
+    { id: 'classic', name: 'Dorado Solar',   desc: 'Las fichas de siempre.',                  cost: 0 },
+    { id: 'wood',    name: 'Madera Tallada', desc: 'Veta cálida de taller artesano.',         cost: 80 },
+    { id: 'emerald', name: 'Esmeralda Real', desc: 'Gema brillante con destellos verdes.',    cost: 150 },
+    { id: 'neon',    name: 'Neón Cyberpunk', desc: 'Luz cian y magenta en la oscuridad.',     ads: 2 },
+    { id: 'gold',    name: 'Oro Imperial',   desc: 'Metal vivo con destello animado.',        cost: 300 },
+  ],
+  wheel: [
+    { id: 'solar',    name: 'Rayo Solar',      desc: 'El clásico naranja y rosa.',            cost: 0 },
+    { id: 'electric', name: 'Rayo Eléctrico',  desc: 'Cian chispeante y letras azules.',      cost: 100 },
+    { id: 'magic',    name: 'Magia Púrpura',   desc: 'Estela mística de violetas.',           ads: 1 },
+    { id: 'aurora',   name: 'Arcoíris Boreal', desc: 'Rayo multicolor que cambia de tono.',   cost: 200 },
+  ],
+};
+let shopTab = 'tile', shopBusyId = null;
+const isOwned = it => !!state.owned[it.id];
+
+/** Pone data-tile y data-wheel en <body>: el CSS hace el resto */
+function applySkins() {
+  document.body.dataset.tile = state.equip.tile;
+  document.body.dataset.wheel = state.equip.wheel;
+}
+/** Vista previa con las mismas variables CSS que el juego real (.pv[data-skin]) */
+function previewHTML(kind, id) {
+  if (kind === 'tile') return `<div class="pv" data-skin="${id}"><div class="pv-tile">A</div></div>`;
+  const st = id === 'aurora' ? ' style="stroke:url(#rainbowP)"' : '';
+  const defs = id === 'aurora'
+    ? '<defs><linearGradient id="rainbowP" gradientUnits="userSpaceOnUse" x1="8" y1="8" x2="52" y2="52"><stop offset="0" stop-color="#4dffb0"/><stop offset=".4" stop-color="#4aa8ff"/><stop offset=".75" stop-color="#c77dff"/><stop offset="1" stop-color="#ff7ad9"/></linearGradient></defs>'
+    : '';
+  const pts = '13.5,43.5 29.5,12.5 46.5,43.5';
+  return `<div class="pv" data-skin="${id}"><div class="pv-wheel"><svg viewBox="0 0 60 60">${defs}<polyline class="g" points="${pts}"${st}/><polyline class="m" points="${pts}"${st}/></svg><i></i><i></i><i></i></div></div>`;
+}
+function renderShop() {
+  $('#shopCoins').textContent = state.coins;
+  document.querySelectorAll('.shop-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === shopTab));
+  const list = $('#shopList'); list.innerHTML = '';
+  SHOP[shopTab].forEach(item => {
+    const owned = isOwned(item), on = state.equip[shopTab] === item.id;
+    const row = document.createElement('div');
+    row.className = 'shop-item' + (on ? ' equipped' : '');
+    row.innerHTML = previewHTML(shopTab, item.id) +
+      `<div><div class="shop-name">${item.name}</div><div class="shop-desc">${item.desc}</div></div>`;
+    const btn = document.createElement('button');
+    btn.className = 'shop-btn';
+    if (on) { btn.classList.add('on'); btn.textContent = '✔ Equipado'; }
+    else if (owned) { btn.classList.add('own'); btn.textContent = 'Equipar'; }
+    else if (item.ads) {
+      btn.classList.add('ad');
+      const p = state.adProg[item.id] || 0;
+      btn.textContent = shopBusyId === item.id ? 'Reproduciendo…' : `🎬 Anuncio ${p}/${item.ads}`;
+      btn.disabled = shopBusyId === item.id;
+    } else {
+      btn.textContent = `🪙 ${item.cost}`;
+      if (state.coins < item.cost) btn.classList.add('poor');
+    }
+    btn.addEventListener('click', () => shopAction(shopTab, item));
+    row.appendChild(btn); list.appendChild(row);
+  });
+}
+function equipItem(kind, id) {
+  state.equip[kind] = id; applySkins(); saveGame(); sfx.hint(); renderShop();
+  toast('¡Aspecto equipado!', 'info');
+}
+function shopAction(kind, item) {
+  ensureAudio();
+  if (isOwned(item)) { equipItem(kind, item.id); return; }
+  if (item.ads) {                                              // desbloqueo por anuncios
+    if (adPlaying) return;
+    shopBusyId = item.id; renderShop();
+    const started = playAd(() => {
+      shopBusyId = null;
+      const p = (state.adProg[item.id] || 0) + 1; state.adProg[item.id] = p;
+      sfx.bonus();
+      if (p >= item.ads) { state.owned[item.id] = true; equipItem(kind, item.id); }
+      else { saveGame(); renderShop(); toast(`Anuncio ${p}/${item.ads}`, 'info'); }
+    }, () => { shopBusyId = null; sfx.bad(); toast('Anuncio no disponible', 'info'); renderShop(); });
+    if (!started) { shopBusyId = null; renderShop(); }
+    return;
+  }
+  if (state.coins < item.cost) {                               // compra con monedas
+    toast(`Te faltan ${item.cost - state.coins} 🪙`, 'info'); sfx.bad(); bump('#shopBalance'); return;
+  }
+  setCoins(state.coins - item.cost);
+  state.owned[item.id] = true;
+  sfx.ok(); equipItem(kind, item.id);
+}
+function openShop() { ensureAudio(); sfx.flip(); renderShop(); $('#shopModal').classList.add('show'); }
+function closeShop() { $('#shopModal').classList.remove('show'); }
+
+/* ---- Casillas con tesoro: 2-3 al azar por nivel ---- */
+function setupTreasures() {
+  state.treasures = new Set();
+  const keys = [...state.layout.cells.keys()].filter(k => !state.revealed.has(k));
+  for (let i = keys.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [keys[i], keys[j]] = [keys[j], keys[i]]; }
+  const n = Math.min(keys.length, 2 + Math.floor(Math.random() * 2));      // 2 o 3
+  keys.slice(0, n).forEach(k => {
+    const el = cellEls.get(k); if (!el) return;
+    el.classList.add('treasure');
+    el.querySelector('.front').innerHTML = '<span class="coin-mark">🪙</span>';
+    state.treasures.add(k);
+  });
+}
+function collectTreasure(el) {
+  setCoins(state.coins + TREASURE_REWARD);
+  sfx.bonus();
+  const r = el.getBoundingClientRect();
+  burst(r.left + r.width / 2, r.top + r.height / 2, 26, GOLD_COLORS);
+  const rp = $('#coinPill').getBoundingClientRect();
+  burst(rp.left + rp.width / 2, rp.top + rp.height / 2, 10, GOLD_COLORS);
+  toast(`🪙 ¡Tesoro! +${TREASURE_REWARD}`, 'bonus', 104);
+}
+
+/* ---- Racha / combo ---- */
+let comboTimer = 0, popTimer = 0;
+function renderCombo(mode) {
+  const b = $('#comboBadge');
+  clearTimeout(comboTimer); clearTimeout(popTimer);
+  if (mode === 'reset') { b.classList.remove('on', 'hot', 'pop', 'lost'); return; }
+  b.classList.remove('lost', 'pop');
+  b.textContent = `🔥 x${state.combo}`;
+  b.classList.toggle('on', state.combo >= 2);
+  b.classList.toggle('hot', state.combo >= COMBO_MIN);
+  if (state.combo >= 2) {
+    void b.offsetWidth; b.classList.add('pop');
+    popTimer = setTimeout(() => b.classList.remove('pop'), 420);   // así la llama (.hot) vuelve a animarse
+  }
+}
+function comboHit() {                                          // llamada en cada palabra nueva (tablero o extra)
+  state.combo++;
+  renderCombo('up');
+  if (state.combo >= COMBO_MIN) {
+    setCoins(state.coins + COMBO_BONUS);
+    toast(`🔥 x${state.combo} +${COMBO_BONUS} 🪙`, 'bonus', 52);
+    const r = $('#coinPill').getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, 12);
+  }
+}
+function loseCombo() {
+  if (state.combo === 0) return;
+  const visible = state.combo >= 2;
+  state.combo = 0;
+  if (!visible) return;
+  const b = $('#comboBadge');
+  clearTimeout(popTimer); b.classList.remove('pop'); b.classList.add('lost');
+  comboTimer = setTimeout(() => b.classList.remove('on', 'hot', 'lost'), 480);
+}
+
+/* ---- Botón "Duplicar recompensa" de la pantalla de victoria ---- */
+function setupDoubleBtn(amount) {
+  const b = $('#doubleBtn');
+  b.disabled = false; b.hidden = !amount;
+  if (!amount) return;
+  const label = `🎬 Duplicar +${amount} 🪙`;
+  b.textContent = label;
+  b.onclick = () => {
+    ensureAudio();
+    b.disabled = true; b.textContent = 'Reproduciendo anuncio…';
+    const started = playAd(() => {
+      setCoins(state.coins + amount);
+      sfx.bonus(); confetti();
+      const r = $('#coinPill').getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height / 2, 18, GOLD_COLORS);
+      b.hidden = true;
+    }, () => {
+      sfx.bad(); b.textContent = 'Anuncio no disponible';
+      setTimeout(() => { b.textContent = label; b.disabled = false; }, 1600);
+    });
+    if (!started) { b.textContent = label; b.disabled = false; }
+  };
+}
+
+function loadLevel(index) {
+  state.levelIndex = index;
+  setTheme(index);
+  const lv = LEVELS[index];
+  const up = s => s.toUpperCase();
+  state.layout = buildCrossword(lv.words.map(up));
+  state.wordSet = new Set(state.layout.words.map(w => w.word));
+  // Palabras que no encajaron en el tablero + las "bonus" definidas → extras
+  state.bonusSet = new Set([...lv.bonus.map(up), ...state.layout.dropped].filter(w => !state.wordSet.has(w)));
+  state.found = new Set(); state.bonusFound = new Set(); state.revealed = new Set();
+  state.letters = up(lv.letters).split('');
+  state.selected = []; state.dragging = false; state.locked = false;
+  renderBoard(); setupTreasures(); buildWheel(); renderBubble();
+  state.combo = 0; renderCombo('reset');
+  const boss = isBoss(index);                                 // Nivel Jefe: 5, 10, 15, 20...
+  document.body.classList.toggle('boss', boss);
+  $('#levelPill').classList.toggle('boss', boss);
+  updateHud(); saveGame();
+  if (boss) setTimeout(() => toast(`👑 ¡Nivel Jefe! +${COIN_REWARD_BOSS} 🪙`, 'info'), 1100);
+}
+function checkLevelComplete() {
+  if (state.locked || state.found.size < state.layout.words.length) return;
+  state.locked = true;
+  const boss = isBoss(state.levelIndex);
+  const reward = boss ? COIN_REWARD_BOSS : COIN_REWARD_LEVEL;
+  sfx.win(); confetti();
+  setCoins(state.coins + reward);
+  const last = state.levelIndex === LEVELS.length - 1;
+  const next = last ? 0 : state.levelIndex + 1;
+  state.levelIndex = next; saveGame();                        // guardamos ya el progreso
+  setTimeout(() => {
+    showOverlay({
+      icon: last ? '🏆' : boss ? '👑' : '🌟',
+      title: last ? '¡Has ganado!' : boss ? '¡Nivel Jefe superado!' : '¡Nivel completado!',
+      text: last ? `Has completado todos los niveles. +${reward} 🪙` : `+${reward} 🪙 — ¡sigue así!`,
+      btn: last ? 'Volver a empezar' : 'Siguiente nivel',
+      onClick: () => loadLevel(next),
+      double: reward,                                         // muestra "Duplicar +10/+30"
+    });
+    confetti();
+  }, 600);
+}
+
+/* ==========================================================================
+   14. HUD Y PANTALLAS
+   ========================================================================== */
+function setCoins(n) {
+  state.coins = n; $('#coins').textContent = n; bump('#coinPill'); saveGame();
+  const sc = $('#shopCoins'); if (sc) sc.textContent = n;     // el saldo de la tienda siempre al día
+}
+function bump(sel) { const el = $(sel); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+function updateHud() {
+  const lvN = state.levelIndex + 1;
+  $('#levelPill').innerHTML = isBoss(state.levelIndex) ? `👑 <small>Nivel ${lvN}</small>` : 'Nivel ' + lvN;
+  const extras = state.bonusFound.size ? ` · +${state.bonusFound.size} extra` : '';
+  $('#progressTxt').textContent = `${state.found.size}/${state.layout.words.length}${extras}`;
+  $('#coins').textContent = state.coins;
+}
+function showOverlay({ icon, title, text, btn, onClick, double = 0 }) {
+  $('#ovIcon').textContent = icon; $('#ovTitle').textContent = title;
+  $('#ovText').textContent = text; $('#ovBtn').textContent = btn;
+  const ov = $('#overlay'); ov.classList.add('show');
+  setupDoubleBtn(double);
+  $('#ovBtn').onclick = () => { ensureAudio(); ov.classList.remove('show'); onClick(); };
+}
+
+/* ==========================================================================
+   15. FONDO DECORATIVO (estrellas y luciérnagas generadas por JS)
+   ========================================================================== */
+function decorate() {
+  const stars = $('#stars');
+  for (let i = 0; i < 40; i++) {
+    const s = document.createElement('i'); s.className = 'star';
+    s.style.left = rand(0, 100) + '%'; s.style.top = rand(0, 100) + '%';
+    s.style.animationDelay = rand(0, 3) + 's'; s.style.animationDuration = rand(2, 5) + 's';
+    s.style.transform = `scale(${rand(.5, 1.2)})`; stars.appendChild(s);
+  }
+  const ff = $('#fireflies');
+  for (let i = 0; i < 16; i++) {
+    const f = document.createElement('i'); f.className = 'firefly';
+    f.style.left = rand(0, 100) + '%'; f.style.top = rand(55, 95) + '%';
+    f.style.animationDuration = rand(6, 12) + 's'; f.style.animationDelay = rand(0, 10) + 's'; ff.appendChild(f);
+  }
+}
+
+/* ==========================================================================
+   16. ARRANQUE Y EVENTOS
+   ========================================================================== */
+$('#shuffleBtn').addEventListener('click', () => { if (!state.locked) shuffleLetters(); });
+$('#hintBtn').addEventListener('click', useHint);
+$('#adBtn').addEventListener('click', watchRewardedAd);
+$('#progressPill').addEventListener('click', openBonusModal);
+$('#bonusClose').addEventListener('click', closeBonusModal);
+$('#bonusDone').addEventListener('click', closeBonusModal);
+$('#bonusModal').addEventListener('click', e => { if (e.target.id === 'bonusModal') closeBonusModal(); });   // clic en el fondo
+addEventListener('keydown', e => { if (e.key === 'Escape') { closeBonusModal(); closeShop(); } });
+$('#shopBtn').addEventListener('click', openShop);
+$('#shopClose').addEventListener('click', closeShop);
+$('#shopDone').addEventListener('click', closeShop);
+$('#shopModal').addEventListener('click', e => { if (e.target.id === 'shopModal') closeShop(); });
+document.querySelectorAll('.shop-tab').forEach(t => t.addEventListener('click', () => { shopTab = t.dataset.tab; sfx.flip(); renderShop(); }));
+$('#soundBtn').addEventListener('click', () => {
+  state.sound = !state.sound; $('#soundBtn').textContent = state.sound ? '🔊' : '🔇'; ensureAudio();
+});
+let rt; addEventListener('resize', () => {                    // al girar/redimensionar recalculamos todo
+  clearTimeout(rt); rt = setTimeout(() => { resizeFx(); fitBoard(); layoutWheel(); }, 80);
+});
+
+// Aviso en consola si algún nivel tiene palabras imposibles con sus letras (útil al crear niveles)
+LEVELS.forEach((lv, i) => {
+  lv.words.concat(lv.bonus).forEach(w => {
+    const pool = lv.letters.toUpperCase().split('');
+    for (const ch of w.toUpperCase()) { const k = pool.indexOf(ch); if (k < 0) { console.warn(`Nivel ${i + 1}: "${w}" no se puede formar con ${lv.letters}`); return; } pool.splice(k, 1); }
+  });
+});
+
+decorate(); resizeFx(); loadGame(); applySkins();
+loadLevel(state.levelIndex);
+requestAnimationFrame(() => { fitBoard(); layoutWheel(); });
+
+// Pantalla de título (también sirve para activar el audio con el primer toque)
+showOverlay({
+  icon: '🌄', title: 'Palabras Conectadas',
+  text: state.levelIndex > 0 ? `Continúa en el nivel ${state.levelIndex + 1}` : 'Une las letras para descubrir todas las palabras',
+  btn: state.levelIndex > 0 ? 'Continuar' : 'Jugar',
+  onClick: () => { fitBoard(); layoutWheel(); },
+});
+</script>
+</body>
+</html>
